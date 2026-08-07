@@ -49,13 +49,23 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
 - **Local persistence only**, no backend — a mandatory constraint from the challenge brief, and
   also the right scope for what's being evaluated here.
 
+- **App framework: React Router + Vite**, over Next.js. The brief permits either; Next.js's main
+  advantages (server rendering, API routes) solve problems this backend-less app doesn't have, so
+  React Router keeps the whole app as plain client-side React.
+
 **Open, not yet decided:** the value-selection control itself (a scroll/rotate "wheel" vs. a
-plain tappable list of values), the desktop/mouse input mapping in detail, a precision fallback
-for landing exact numbers, and the app framework (Next.js vs. React Router).
+plain tappable list of values), the desktop/mouse input mapping in detail, and a precision
+fallback for landing exact numbers.
 
 ## Setup
 
-Not yet available — the project has not been scaffolded.
+```
+npm install
+npm run dev
+```
+
+Scaffolded with Vite (`react-ts` template), using React Router for navigation and Ant Design as
+the component/form system.
 
 ## Agent usage
 

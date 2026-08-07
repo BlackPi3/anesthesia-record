@@ -76,6 +76,31 @@ for a real backend later without a UI rewrite, since only the persistence layer 
 
 ---
 
+## 2026-08-07 — App framework: React Router + Vite over Next.js
+
+**What:** Scaffold the app with Vite + React + TypeScript, using React Router for navigation.
+
+**Why:** The brief explicitly permits either Next.js or React Router
+("*Verwende wahlweise Next.js oder React Router*") — this is a sanctioned, not improvised, choice.
+The app has no backend and never will within this challenge's scope: everything is a browser-side
+component saving to local storage. Next.js's main differentiators — server-side rendering, API
+routes (a built-in Node-style backend), the server/client component split — solve problems this
+app doesn't have. Choosing it would mean learning an extra architectural layer (which files run
+"on the server") for zero functional benefit, and would obscure that the whole app is client code.
+React Router keeps 100% of the code as plain browser-side React, matching what the app actually
+is. React Router's routing model is also conceptually close to Next.js's, so nothing here is a
+dead end if a later project needs Next.js.
+
+**Vite specifically:** not named in the brief (only Next.js vs. React Router is), but some build
+tool is required since React Router doesn't bundle one the way Next.js does. Vite is the current
+standard: fast dev server, minimal config. Alternatives considered: Create React App (effectively
+unmaintained at this point, not a reasonable pick today), configuring Webpack directly (far more
+manual setup for no benefit here).
+
+**Rejected:** Next.js (App Router) — see above.
+
+---
+
 ## Open decisions (not yet made)
 
 - **Value-selection control**: scrollable/rotatable "wheel" vs. a plain tappable list of values.
@@ -86,7 +111,4 @@ for a real backend later without a UI rewrite, since only the persistence layer 
 - **Precision fallback**: how to guarantee landing an exact number (e.g. large live numeric
   readout while scrubbing, or direct numeric entry) when scrubbing/swiping alone isn't precise
   enough.
-- **App framework**: Next.js (App Router) vs. React Router + Vite. Leaning React Router for a
-  local-only, client-only app (no server/client component boundary to learn for no benefit), not
-  yet confirmed.
 - **NiBP grouped rendering** on the timeline (see above).
