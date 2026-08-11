@@ -24,9 +24,46 @@ Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprot
 
 ## Status
 
-Design phase. The core interaction model for entering values (see below) and the problem scope
-are settled; implementation has not started. This README grows alongside the build — setup,
-architecture, and data model sections will be filled in as they exist.
+The problem scope, the core interaction model, and the data model are settled. The domain layer
+exists: case and entry types, the vital/event catalogue with its German labels and ranges, the
+local-storage persistence layer, and a fictional demo case. Next is the timeline itself.
+
+This README grows alongside the build; sections appear as the thing they describe does.
+
+## Data model
+
+`src/domain/types.ts` holds the model, and the reasoning behind each shape is in
+[`docs/decisions.md`](docs/decisions.md). In short:
+
+A **case** is a patient, a procedure, a date, a timeline origin, and a flat list of entries.
+
+An **entry** is one of four shapes in a discriminated union, tagged by `type`:
+
+| `type` | records | shape |
+|---|---|---|
+| `vital` | one measured value | point in time |
+| `bolus` | a single dose | point in time |
+| `infusion` | a continuous rate | interval, open while running |
+| `event` | a phase milestone | point in time |
+
+Blood pressure is three `vital` entries (systolic, mean, diastolic) sharing one timestamp, so
+every vital entry carries exactly one number.
+
+Times are epoch milliseconds. Corrections are non-destructive: editing pushes the previous values
+onto the entry's `revisions`, and removal sets `deletedAt`, so the record keeps the audit trail
+the brief asks for.
+
+`src/domain/catalog.ts` holds the per-vital German labels, units, plotted axis ranges, and the
+wider ranges the value control accepts. Both the chart and the entry control read their numbers
+from there, which is what keeps the axis and the picker from disagreeing.
+
+`src/domain/storage.ts` is the only file that touches `localStorage`. Load and save return result
+unions rather than throwing, so every caller has to handle the failure cases that local storage
+really produces, and the load outcomes map directly onto the empty and error states in the UI.
+
+**Demo data is fictional**, in `src/domain/demoCase.ts`: a placeholder patient (Erika Mustermann)
+and invented values, with fixed timestamps so the chart, the screenshots, and the tests all see
+the same case on every run.
 
 ## Current design decisions
 

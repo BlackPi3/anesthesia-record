@@ -101,11 +101,95 @@ manual setup for no benefit here).
 
 ---
 
+## 2026-08-11 — Timeline drawn as hand-rolled SVG, not a chart library
+
+**What:** The timeline is written directly as SVG, with the time and value scales (and their
+inverses, for pointer input) written by hand rather than taken from a charting library.
+
+**Why:** Charting libraries are built to *display* a dataset, not to *author* one by pointer. The
+graded core of this challenge is the other direction: mapping a pointer coordinate back to a
+(timestamp, value) pair, hit-testing an existing point to correct it, and dragging it precisely.
+That inverse mapping is the part a library does not provide, so adopting one would leave the hard
+work untouched while adding an abstraction layer between the pointer events and the coordinates.
+Writing the scales directly keeps the coordinate maths visible and explainable.
+
+**Rejected:** Recharts or a similar high-level library (owns rendering, fights authoring
+interactions). visx (gives scale helpers without owning rendering, so it is the closest
+alternative — the scales needed here are two linear maps and their inverses, which is less code
+than the dependency). Canvas (best redraw performance, but no DOM nodes means no per-point focus
+handling and no accessible markup, which Part 2 grades explicitly).
+
+**Consequence accepted:** coordinate maths is the known failure mode for generated code here, so
+the timeline gets verified by interaction and by unit tests on the scale functions, not by
+reading the code.
+
+---
+
+## 2026-08-11 — Times stored as epoch milliseconds
+
+**What:** Every point in time in the data model is a `number` (milliseconds since the epoch).
+Calendar dates that carry no time of day (birth date, case date) stay ISO `YYYY-MM-DD` strings.
+
+**Why:** The timeline converts time to an x coordinate arithmetically, on every render. A number
+needs no parsing and survives the JSON round-trip through local storage unchanged. ISO strings
+would be more readable when inspecting stored data by hand, which is the trade accepted.
+
+---
+
+## 2026-08-11 — Entries as a discriminated union; bolus and infusion modelled separately
+
+**What:** One `Entry` union over four shapes, tagged by a `type` field: `vital`, `bolus`,
+`infusion`, `event`. Medications are two of those four rather than one type with a mode flag.
+
+**Why:** The four kinds carry genuinely different fields, and the union makes the compiler enforce
+which fields exist in which branch instead of scattering optional properties over one wide type.
+Bolus and infusion are split because a bolus is a point in time while an infusion is an interval
+with a start, an end and a rate: different shape, different rendering, different edit form.
+
+**Rejected:** A single flat entry type with optional fields (compiles, but pushes every "does this
+entry have a dose?" question to runtime).
+
+---
+
+## 2026-08-11 — Corrections are non-destructive
+
+**What:** Editing an entry pushes the previous values onto a `revisions` array on that entry.
+Removing an entry sets `deletedAt` rather than dropping it from the record.
+
+**Why:** The brief requires corrections and removals to leave a clear audit trail, which is only
+possible if the earlier state is still stored. Keeping the trail on the entry itself means showing
+it is a local read, with no join back to a separate log.
+
+**Rejected:** A separate append-only journal of create/update/delete operations. Closer to how a
+real clinical system would do it and better if multiple users ever edit one case, but it needs
+more code and a lookup to answer "what changed about *this* point", which is the only question
+the UI asks here.
+
+---
+
+## 2026-08-11 — Storage failures are returned, not thrown
+
+**What:** `loadCase()` and `saveCase()` return result unions (`empty` / `loaded` / `error`,
+`saved` / `error`) instead of throwing or returning `null`.
+
+**Why:** Local storage genuinely fails: Safari private windows deny access, quota can be
+exceeded, and the stored string can be truncated or hand-edited. Returning the outcome forces
+every caller to handle failure, and the three load outcomes map one-to-one onto the empty and
+error states Part 2 requires the UI to show. A persisted schema version is stored alongside, so
+data from an older shape is reported rather than guessed at.
+
+**Scope decision:** the shape check on loaded data is a hand-written type guard covering the
+fields the app dereferences, not full runtime validation. A schema validator (zod) is the right
+answer for a format that outlives the code and is the natural next step if the model grows.
+
+---
+
 ## Open decisions (not yet made)
 
 - **Value-selection control**: scrollable/rotatable "wheel" vs. a plain tappable list of values.
   Both keep the same "+", pick metric, pick value flow — differ in how the value step feels and
-  how precise it is.
+  how precise it is. **Decided by building:** the timeline and a first version of the control come
+  first, and this gets settled on the working thing rather than in the abstract.
 - **Desktop/mouse input mapping** for the value control: click-drag, scroll wheel, and/or
   keyboard arrows all proposed, not yet finalized in detail.
 - **Precision fallback**: how to guarantee landing an exact number (e.g. large live numeric
