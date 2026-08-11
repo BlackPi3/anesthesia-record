@@ -138,8 +138,8 @@ export function saveCase(value: AnesthesiaCase, now: Timestamp = Date.now()): Sa
     return {
       status: 'error',
       message: quotaExceeded
-        ? 'Der lokale Speicher ist voll. Die letzte Änderung wurde nicht gesichert.'
-        : 'Die Änderung konnte nicht gesichert werden.',
+        ? 'Der lokale Speicher ist voll. Die letzte Änderung wurde nicht gespeichert.'
+        : 'Die Änderung konnte nicht gespeichert werden.',
     }
   }
 

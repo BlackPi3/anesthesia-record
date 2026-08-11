@@ -9,7 +9,8 @@
  */
 
 import { GRID_INTERVAL_MS } from '../domain/catalog'
-import type { Timestamp } from '../domain/types'
+import { entryTimes, visibleEntries } from '../domain/entries'
+import type { AnesthesiaCase, Timestamp } from '../domain/types'
 
 /**
  * A linear map between a domain (times, or measured values) and a range (pixels), with its
@@ -115,6 +116,25 @@ export interface PlotArea {
 export interface TimeWindow {
   from: Timestamp
   to: Timestamp
+}
+
+/**
+ * The time span the timeline shows: from the start of the case to the last thing documented,
+ * both rounded outward to gridline boundaries so the axis begins and ends on a labelled mark.
+ *
+ * `minimumSpan` keeps an empty case from collapsing to a zero-width axis, which is the state the
+ * app opens in before anything has been entered.
+ */
+export function caseTimeWindow(
+  record: AnesthesiaCase,
+  minimumSpan: number = 60 * 60_000,
+): TimeWindow {
+  const times = visibleEntries(record).flatMap(entryTimes)
+  const from = Math.floor(record.startedAt / GRID_INTERVAL_MS) * GRID_INTERVAL_MS
+  const last = times.length > 0 ? Math.max(...times) : from
+  const to = Math.max(last, from + minimumSpan)
+
+  return { from, to: Math.ceil(to / GRID_INTERVAL_MS) * GRID_INTERVAL_MS }
 }
 
 export interface LaneScales {

@@ -96,6 +96,32 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
 plain tappable list of values), the desktop/mouse input mapping in detail, and a precision
 fallback for landing exact numbers.
 
+## Timeline
+
+`src/timeline/` draws the record as one lane per vital parameter over a shared time axis, with
+medications and phase events in bands beneath. It is hand-rolled SVG: charting libraries are
+built to display a dataset, and the graded interaction here runs the other way, mapping a pointer
+position back to a timestamp and a value.
+
+The coordinate maths lives in [`src/timeline/scales.ts`](src/timeline/scales.ts) as plain
+functions with no React and no SVG, so the part most likely to be subtly wrong is tested with
+numbers rather than through a rendered component. The SVG y-axis inversion is expressed once, as
+a descending pixel range on the value scale, instead of a subtraction repeated wherever y is
+touched.
+
+Each lane owns one value scale. That is what keeps the pixel-to-value mapping unambiguous and
+scopes hit-testing to a lane instead of guessing between overlapping series. Lanes are declared
+as configuration in `src/domain/catalog.ts`, so regrouping them is an edit to that list.
+
+Phase events are drawn as dashed rules through every lane, so the vitals at incision can be read
+without leaving the entry layout.
+
+Colours are the four categorical slots in fixed order, one per lane, validated for colour-vision
+separation against the surface. Two of them fall below 3:1 contrast, so identity never rests on
+hue: every lane carries a permanent text label, and within the Blutdruck lane the three pressures
+are told apart by marker shape (systolic points up, diastolic down, the mean is a dot) as on the
+paper protocol.
+
 ## Setup
 
 ```
@@ -105,6 +131,17 @@ npm run dev
 
 Scaffolded with Vite (`react-ts` template), using React Router for navigation and Ant Design as
 the component/form system.
+
+```
+npm run build     # typecheck and production build
+npm run lint
+npm test          # Vitest unit tests
+npm run e2e       # Playwright, starts the dev server itself
+```
+
+Playwright runs two projects, desktop Chrome and an iPad-sized viewport with touch, and records
+video of every run. Verification in real Safari on a physical iPad is a separate step that
+emulation does not replace.
 
 ## Agent usage
 

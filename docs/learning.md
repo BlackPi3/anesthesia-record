@@ -66,6 +66,7 @@ arithmetic. Keeping the maths separate from the drawing makes the risky part dir
 
 ## Open questions to revisit
 
-- German terminology in `src/domain/catalog.ts` still needs a check against how anesthesiologists
-  actually write it: `RR sys` / `RR mittel` / `RR dia` for the blood pressure abbreviations, and
-  `Blutdruck Mitteldruck` for the mean.
+- German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional
+  abbreviation for blood pressure on a protocol, but some newer German documentation writes
+  `NIBP`. House style to confirm. The mean was first written as `Blutdruck Mitteldruck`, which is
+  redundant and not what the value is called — corrected to *mittlerer arterieller Druck* (`MAD`).

@@ -58,8 +58,8 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     decimals: 0,
   },
   bloodPressureMean: {
-    label: 'Blutdruck Mitteldruck',
-    short: 'RR mittel',
+    label: 'Mittlerer arterieller Druck',
+    short: 'MAD',
     unit: 'mmHg',
     plotRange: [40, 220],
     inputRange: [30, 250],

@@ -168,6 +168,8 @@ export interface AnesthesiaCase {
   patient: Patient
   procedure: string
   date: IsoDate
+  /** Pre-operative reference values, shown in the header and never plotted. */
+  baseline: Baseline
   /**
    * Origin of the timeline's x-axis. Separate from the `anesthesiaStart` event so the chart has
    * a window to draw before any entry exists, which is the empty state the app opens in.

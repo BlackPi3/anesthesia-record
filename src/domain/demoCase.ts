@@ -42,10 +42,10 @@ function vital(kind: VitalKind, minutes: number, value: number): VitalEntry {
   }
 }
 
-const MEASUREMENT_MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45]
+const MEASUREMENT_MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
 
-const spo2 = [98, 99, 99, 100, 100, 99, 98, 99, 99, 100]
-const heartRate = [78, 74, 71, 69, 79, 83, 81, 77, 74, 72]
+const spo2 = [98, 99, 99, 100, 100, 99, 98, 99, 99, 100, 99, 98, 98]
+const heartRate = [78, 74, 71, 69, 79, 83, 81, 77, 74, 72, 71, 73, 75]
 
 const spo2Entries = MEASUREMENT_MINUTES.map((minutes, i) => vital('spo2', minutes, spo2[i]))
 
@@ -70,6 +70,8 @@ const bloodPressure: Array<[minutes: number, sys: number, mean: number, dia: num
   [20, 105, 76, 61],
   [30, 112, 82, 66],
   [40, 124, 91, 74],
+  [50, 129, 95, 78],
+  [60, 133, 98, 80],
 ]
 
 const bloodPressureEntries = bloodPressure.flatMap(([minutes, sys, mean, dia]) => [
@@ -83,6 +85,7 @@ const temperatureEntries = [
   vital('temperature', 15, 36.4),
   vital('temperature', 30, 36.2),
   vital('temperature', 45, 36.3),
+  vital('temperature', 60, 36.5),
 ]
 
 function phaseEvent(event: PhaseEventKind, minutes: number): PhaseEventEntry {
@@ -102,7 +105,7 @@ const eventEntries: PhaseEventEntry[] = [
   phaseEvent('incision', 12),
   phaseEvent('suture', 41),
   phaseEvent('emergenceEnd', 48),
-  phaseEvent('discharge', 95),
+  phaseEvent('discharge', 75),
 ]
 
 const bolusEntries: BolusEntry[] = [
@@ -194,6 +197,11 @@ export function createDemoCase(): AnesthesiaCase {
     },
     procedure: 'Arthroskopie rechtes Knie',
     date: CASE_DATE,
+    baseline: {
+      bloodPressureSystolic: 142,
+      bloodPressureDiastolic: 85,
+      heartRate: 80,
+    },
     startedAt: CASE_START,
     entries,
   } satisfies AnesthesiaCase)
