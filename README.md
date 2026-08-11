@@ -26,7 +26,9 @@ Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprot
 
 The problem scope, the core interaction model, and the data model are settled. The domain layer
 exists: case and entry types, the vital/event catalogue with its German labels and ranges, the
-local-storage persistence layer, and a fictional demo case. Next is the timeline itself.
+local-storage persistence layer, and a fictional demo case. The timeline's coordinate maths and
+lane layout are in place and unit-tested. Next is drawing the lanes and wiring pointer input to
+them.
 
 This README grows alongside the build; sections appear as the thing they describe does.
 

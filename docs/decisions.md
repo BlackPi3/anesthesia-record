@@ -184,6 +184,58 @@ answer for a format that outlives the code and is the natural next step if the m
 
 ---
 
+## 2026-08-11 — Timeline laid out as one lane per vital parameter
+
+**What:** Four horizontal lanes sharing one time axis — SpO₂, Herzfrequenz, Blutdruck,
+Temperatur — with medications and events in a band beneath. Blood pressure's three kinds share
+the Blutdruck lane, since the brief counts non-invasive blood pressure as one parameter.
+
+**Why:** Writing and reading the record pull in opposite directions. Entry is per-parameter, one
+value at a time, usually while the anesthesiologist's hands are on the patient; reading is
+cross-parameter and happens when something has gone wrong. Lanes serve entry and correction,
+which is the graded interaction: one scale per lane means the pixel-to-value map is unambiguous,
+and hit-testing a point to correct it is scoped to a lane instead of guessing between overlapping
+series. Each parameter also gets an honest range, so temperature shows a trend instead of the flat
+line it becomes on a scale sized for blood pressure.
+
+**Rejected:** Overlaying all vitals on one plot area. Densest, closest to the paper protocol, and
+better value resolution per series since each maps across the full height. Rejected because a y
+pixel would mean four different things, hit-testing collides where series cross, temperature
+becomes unreadable, and per-series axis labelling works against the contrast and focus
+requirements in Part 2.
+
+**Lanes are configuration, not structure.** The lane list declares which vital kinds share a
+scale, so regrouping (six lanes, one per kind, or three with heart rate and blood pressure
+combined on their shared 40–220 grid) is a change to that list rather than to the component.
+
+---
+
+## 2026-08-11 — Merged reading view deferred, not dropped
+
+**What:** A second, read-only view that brings all lanes together into one overlaid plot for
+reading. Parked deliberately, to be built only if Parts 1 and 2 are finished.
+
+**Why it is worth building eventually:** the layout that is best for entry is not the layout that
+is best for reading, because they happen at different moments and answer different questions.
+Lanes answer "what is this parameter doing"; an overlay answers the question people actually put
+to the chart, which is "the pressure is falling, since when, and what did I give before it
+started". That question spans medications, pressure and heart rate at once.
+
+**Why it is deferred:** a second layout is close to a second timeline, and the timeline is the
+part of the budget most likely to overrun. The cost falls sharply if the merged view is strictly
+read-only — no pointer mapping, no hit-testing, no editing — which is the expensive half. So the
+deferred version is explicitly a viewing mode, and entry and correction stay in the lanes.
+
+**Cheaper step to take first:** a shared vertical time cursor across all lanes, showing every
+parameter's value at one timestamp in a single gesture. That recovers most of the correlation
+value without a second layout or a mode the user can get lost in. If it turns out to be enough,
+the merged view stays unbuilt on purpose.
+
+**Risk noted:** a view you have to switch into is a view you are not in when it matters. Any
+merged view added later needs to be reachable in one action from the entry layout.
+
+---
+
 ## Open decisions (not yet made)
 
 - **Value-selection control**: scrollable/rotatable "wheel" vs. a plain tappable list of values.

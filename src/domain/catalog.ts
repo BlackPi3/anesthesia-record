@@ -141,3 +141,58 @@ export const FLUIDS = ['Ringer-Acetat', 'NaCl 0,9 %', 'Glucose 5 %'] as const
 
 /** Gridline spacing on the time axis, in milliseconds. Reference only, entries are not snapped. */
 export const GRID_INTERVAL_MS = 5 * 60 * 1000
+
+// ---------------------------------------------------------------------------
+// Lanes
+// ---------------------------------------------------------------------------
+
+export type LaneId = 'spo2' | 'heartRate' | 'bloodPressure' | 'temperature'
+
+/**
+ * One horizontal band of the timeline. A lane owns a single value scale, which is what makes the
+ * pixel-to-value mapping unambiguous; the vital kinds listed in it share that scale and therefore
+ * must share a unit (asserted in the tests).
+ *
+ * This list is the layout. Regrouping the timeline — one lane per kind, or heart rate and blood
+ * pressure combined on their shared grid — is an edit here, not a change to the component.
+ */
+export interface LaneDef {
+  id: LaneId
+  /** German label shown at the lane's edge. */
+  label: string
+  vitals: readonly VitalKind[]
+  /** Relative height. Lanes are sized in proportion to these, not in pixels. */
+  weight: number
+}
+
+export const LANES: readonly LaneDef[] = [
+  { id: 'spo2', label: 'Sauerstoffsättigung', vitals: ['spo2'], weight: 1 },
+  { id: 'heartRate', label: 'Herzfrequenz', vitals: ['heartRate'], weight: 1 },
+  { id: 'bloodPressure', label: 'Blutdruck', vitals: BLOOD_PRESSURE_KINDS, weight: 1.4 },
+  { id: 'temperature', label: 'Temperatur', vitals: ['temperature'], weight: 0.8 },
+]
+
+/**
+ * The lane's y-axis domain: the widest plot range across the kinds it holds, so no member series
+ * can fall outside the drawn axis. Derived rather than declared, so VITALS stays the one place a
+ * range is written down.
+ */
+export function laneRange(lane: LaneDef): [number, number] {
+  const ranges = lane.vitals.map((kind) => VITALS[kind].plotRange)
+  return [
+    Math.min(...ranges.map(([min]) => min)),
+    Math.max(...ranges.map(([, max]) => max)),
+  ]
+}
+
+/** The unit shared by every kind in the lane. */
+export function laneUnit(lane: LaneDef): string {
+  return VITALS[lane.vitals[0]].unit
+}
+
+/** Which lane a vital kind is drawn in. */
+export function laneForVital(kind: VitalKind): LaneDef {
+  const lane = LANES.find((candidate) => candidate.vitals.includes(kind))
+  if (!lane) throw new Error(`No lane is configured for vital "${kind}".`)
+  return lane
+}

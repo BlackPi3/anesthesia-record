@@ -40,6 +40,30 @@ how data arriving from outside the program (parsed JSON) gets back into the type
 
 ---
 
+## 2026-08-11 — Two things about the coordinate maths
+
+**The SVG y-axis inversion is not a special case.** Screen y grows downward, values grow upward,
+so a high SpO₂ has to land near the top of the lane. The obvious way to write that is to subtract
+from the height somewhere, and then remember to do it in every place that touches y. The better
+way is to build the value scale with its pixel range written descending, `[bottom, top]`. The
+same linear formula then produces the flip on its own, and no other code has to know about it.
+
+Worth remembering as a general shape: when a rule has to be applied everywhere, look for the one
+place it can be expressed instead.
+
+**Floating point leaks into stored data if you let it.** `Math.round(36.35 / 0.1) * 0.1` is
+`36.400000000000006`. That value would go straight into local storage and onto the screen. Snapping
+therefore rounds and then trims to the decimals the step implies. This is not a display concern
+that can be fixed at render time; the wrong number would be the one that got saved.
+
+**Why these functions have no React in them.** `scales.ts` is plain functions, and the tests call
+them directly with numbers. Coordinate maths is the code most likely to look correct and be wrong,
+and testing it through a rendered component would mean simulating pointer events to check
+arithmetic. Keeping the maths separate from the drawing makes the risky part directly testable —
+21 tests, no DOM.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts` still needs a check against how anesthesiologists
