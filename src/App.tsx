@@ -16,13 +16,15 @@ import { Alert, Typography } from 'antd'
 
 import { CaseHeader } from './CaseHeader'
 import { createDemoCase } from './domain/demoCase'
+import { correctVital, removeEntry } from './domain/mutations'
 import { loadCase, saveCase } from './domain/storage'
 import type { AnesthesiaCase } from './domain/types'
 import { Timeline } from './timeline/Timeline'
+import { useCase } from './useCase'
 
-type Status = { kind: 'ready'; record: AnesthesiaCase } | { kind: 'error'; message: string }
+type Opened = { kind: 'ready'; record: AnesthesiaCase } | { kind: 'error'; message: string }
 
-function openCase(): Status {
+function openCase(): Opened {
   const result = loadCase()
 
   if (result.status === 'error') return { kind: 'error', message: result.message }
@@ -36,16 +38,16 @@ function openCase(): Status {
 }
 
 export default function App() {
-  const [status] = useState<Status>(openCase)
+  const [opened] = useState<Opened>(openCase)
 
-  if (status.kind === 'error') {
+  if (opened.kind === 'error') {
     return (
       <div className="app app__centered">
         <Alert
           type="error"
           showIcon
           message="Das Protokoll konnte nicht geladen werden"
-          description={status.message}
+          description={opened.message}
           style={{ maxWidth: 520 }}
         />
         <Typography.Text type="secondary">
@@ -55,11 +57,25 @@ export default function App() {
     )
   }
 
+  return <OpenCase initial={opened.record} />
+}
+
+/**
+ * Split out so the case hook is only ever created with a case that actually loaded, which keeps
+ * its state non-optional.
+ */
+function OpenCase({ initial }: { initial: AnesthesiaCase }) {
+  const { record, save, update } = useCase(initial)
+
   return (
     <div className="app">
-      <CaseHeader record={status.record} />
+      <CaseHeader record={record} save={save} />
       <main className="app__main">
-        <Timeline record={status.record} />
+        <Timeline
+          record={record}
+          onCorrect={(id, next) => update(correctVital(record, id, next))}
+          onRemove={(id) => update(removeEntry(record, id))}
+        />
       </main>
     </div>
   )

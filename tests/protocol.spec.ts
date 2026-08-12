@@ -6,8 +6,9 @@ import { expect, test } from '@playwright/test'
  */
 
 test.beforeEach(async ({ page }) => {
-  // Each test starts from a first visit, so the app seeds the demo case itself.
-  await page.addInitScript(() => window.localStorage.clear())
+  // Each test gets a fresh browser context with empty storage, so the app seeds the demo case on
+  // the first visit. Nothing clears storage here: an addInitScript clear would run again on every
+  // reload, which would silently defeat the persistence test below.
   await page.goto('/')
 })
 
@@ -19,13 +20,14 @@ test('shows the case header with the demo patient', async ({ page }) => {
 })
 
 test('draws one lane per vital parameter plus the bands', async ({ page }) => {
+  // Lanes are groups rather than images: they take focus and accept keyboard correction.
   for (const label of [
     /Sauerstoffsättigung, Achse/,
     /Herzfrequenz, Achse/,
     /Blutdruck, Achse/,
     /Temperatur, Achse/,
   ]) {
-    await expect(page.getByRole('img', { name: label })).toBeVisible()
+    await expect(page.getByRole('group', { name: label })).toBeVisible()
   }
 
   await expect(page.getByRole('img', { name: 'Medikamente und Infusionen' })).toBeVisible()
@@ -33,11 +35,18 @@ test('draws one lane per vital parameter plus the bands', async ({ page }) => {
   await expect(page.getByRole('img', { name: /Zeitachse von/ })).toBeVisible()
 })
 
-test('keeps the case after a reload', async ({ page }) => {
-  await expect(page.getByRole('heading', { name: 'Mustermann, Erika' })).toBeVisible()
+test('restores the stored case after a reload rather than seeding a new one', async ({ page }) => {
+  // Comparing the saved timestamp is what makes this test mean something: a screen that merely
+  // looks right would also appear if the app had thrown the case away and re-seeded it.
+  const savedAt = () =>
+    page.evaluate(() => JSON.parse(window.localStorage.getItem('anesthesia-record:case')!).savedAt)
+
+  const before = await savedAt()
   await page.reload()
+
   await expect(page.getByRole('heading', { name: 'Mustermann, Erika' })).toBeVisible()
-  await expect(page.getByRole('img', { name: /Blutdruck, Achse/ })).toBeVisible()
+  await expect(page.getByRole('group', { name: /Blutdruck, Achse/ })).toBeVisible()
+  expect(await savedAt()).toBe(before)
 })
 
 test('reports a clear error when the stored case is corrupt', async ({ page }) => {

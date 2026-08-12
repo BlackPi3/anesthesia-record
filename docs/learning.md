@@ -64,6 +64,35 @@ arithmetic. Keeping the maths separate from the drawing makes the risky part dir
 
 ---
 
+## 2026-08-12 — Two bugs that only exist in React, and one only tests could catch
+
+**Side effects do not belong in a state updater.** The first version of `useCase` wrote to local
+storage inside `setRecord(current => …)`. React calls those updater functions **twice** in
+development, deliberately, to expose exactly this: the write would have happened twice per
+correction. The updater's only job is to compute the next state from the previous one. Anything
+with a consequence outside React belongs in the event handler around it.
+
+The fix also removed the reason the updater was needed: the caller already holds the current
+case, so the comparison can happen in the handler, and the whole thing became simpler.
+
+**Pointer capture.** Without `setPointerCapture`, a drag that leaves the lane stops receiving
+events and the point freezes mid-correction, with the pointer still down. One call routes every
+later event for that pointer to the element that captured it. This is not discoverable by
+reading; it is discoverable by dragging off the edge and watching the point stick.
+
+**A test can pass and prove nothing.** The reload test used `page.addInitScript(() =>
+localStorage.clear())` in `beforeEach`. That script runs on *every* navigation, including
+`page.reload()` — so the test cleared storage, reloaded, watched the app seed a fresh demo case,
+saw the patient name and passed. It would have passed with persistence entirely broken. It only
+surfaced when a correction test reloaded and found its change gone.
+
+The lesson is about the assertion, not the API: "the screen still looks right" is not evidence of
+persistence, because a re-seeded case looks identical. The test now compares the stored `savedAt`
+across the reload, which differs if the case was thrown away and rebuilt. **When writing a test,
+ask what would still make it pass if the feature were deleted.**
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

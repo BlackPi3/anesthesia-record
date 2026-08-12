@@ -102,10 +102,24 @@ body {
   margin-top: 12px;
 }
 
-/* Touch input must not be interpreted as text selection while dragging a point. */
+.case-header__save {
+  margin-left: auto;
+}
+
+/* Touch input must not be interpreted as text selection or a scroll while dragging a point. */
 .timeline svg {
   display: block;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.timeline__lane {
+  border-radius: 4px;
+}
+
+/* Lanes are keyboard-reachable, so the focus ring has to be real and visible. */
+.timeline__lane:focus-visible {
+  outline: 2px solid #184f95;
+  outline-offset: -2px;
 }

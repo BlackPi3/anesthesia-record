@@ -11,11 +11,11 @@
  * read without leaving the entry layout. That is the cheap half of the merged reading view
  * deferred in docs/decisions.md.
  *
- * This renders the record. Pointer entry and correction are wired in next; the scales the
- * interaction needs are already built here.
+ * Correction is the interaction here: press a point, drag it, release. Creation via the "+" flow
+ * is separate and still to come.
  */
 
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 
 import {
   GRID_INTERVAL_MS,
@@ -26,12 +26,20 @@ import {
   laneUnit,
 } from '../domain/catalog'
 import { medications, phaseEvents, vitalSeries } from '../domain/entries'
-import type { AnesthesiaCase, PhaseEventEntry, VitalKind } from '../domain/types'
+import type { AnesthesiaCase, PhaseEventEntry, Timestamp, VitalKind } from '../domain/types'
 import type { LaneDef } from '../domain/catalog'
-import { formatTime, formatNumber } from '../format'
+import { formatTime, formatNumber, formatValue } from '../format'
 import { chart, laneColor } from '../theme'
 import { useElementWidth } from '../useElementWidth'
-import { createLaneScales, caseTimeWindow, gridTimes, type TimeWindow } from './scales'
+import {
+  clamp,
+  createLaneScales,
+  caseTimeWindow,
+  gridTimes,
+  pointerToMeasurement,
+  snapToStep,
+  type TimeWindow,
+} from './scales'
 
 /**
  * Width of the left gutter holding lane labels and axis values. Sized so the longest German lane
@@ -46,10 +54,27 @@ const AXIS_HEIGHT = 30
 const MED_ROW_HEIGHT = 26
 const EVENT_ROW_HEIGHT = 34
 
+/**
+ * How close a pointer must be to a point to grab it, in pixels. 22 gives a 44px target, the size
+ * a fingertip hits reliably, while still resolving points five minutes apart on a normal axis.
+ */
+const HIT_RADIUS = 22
+/** Movement past this counts as a drag rather than a tap. */
+const DRAG_THRESHOLD = 4
+/** One arrow-key press along the time axis. */
+const KEY_TIME_STEP = 60_000
+
 // ---------------------------------------------------------------------------
 
-export function Timeline({ record }: { record: AnesthesiaCase }) {
+export interface TimelineProps {
+  record: AnesthesiaCase
+  onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
+  onRemove: (id: string) => void
+}
+
+export function Timeline({ record, onCorrect, onRemove }: TimelineProps) {
   const [ref, width] = useElementWidth<HTMLDivElement>()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const window = caseTimeWindow(record)
   const events = phaseEvents(record)
 
@@ -66,6 +91,10 @@ export function Timeline({ record }: { record: AnesthesiaCase }) {
               window={window}
               record={record}
               events={events}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onCorrect={onCorrect}
+              onRemove={onRemove}
             />
           ))}
           <MedicationBand width={width} window={window} record={record} />
@@ -139,15 +168,52 @@ function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
 
 // ---------------------------------------------------------------------------
 
+interface LanePoint {
+  id: string
+  kind: VitalKind
+  at: Timestamp
+  value: number
+  x: number
+  y: number
+}
+
+/** A correction in progress. Lives in the lane, since a drag never leaves the lane it began in. */
+interface Drag {
+  pointerId: number
+  id: string
+  kind: VitalKind
+  startX: number
+  startY: number
+  moved: boolean
+  at: Timestamp
+  value: number
+}
+
 interface LaneProps {
   lane: LaneDef
   width: number
   window: TimeWindow
   record: AnesthesiaCase
   events: PhaseEventEntry[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+  onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
+  onRemove: (id: string) => void
 }
 
-function VitalLane({ lane, width, window, record, events }: LaneProps) {
+function VitalLane({
+  lane,
+  width,
+  window,
+  record,
+  events,
+  selectedId,
+  onSelect,
+  onCorrect,
+  onRemove,
+}: LaneProps) {
+  const [drag, setDrag] = useState<Drag | null>(null)
+
   const height = Math.round(LANE_BASE_HEIGHT * lane.weight)
   const area = {
     left: GUTTER,
@@ -163,13 +229,140 @@ function VitalLane({ lane, width, window, record, events }: LaneProps) {
   const valueTicks = [min, (min + max) / 2, max]
   const grid = gridTimes(window.from, window.to)
 
+  // The point being dragged renders at the pointer, not at its stored position, so the correction
+  // is visible while it is being made rather than only after release.
+  const seriesByKind = lane.vitals.map((kind) => ({
+    kind,
+    points: vitalSeries(record, kind)
+      .map((entry): LanePoint => {
+        const live = drag && drag.id === entry.id ? drag : null
+        const at = live ? live.at : entry.at
+        const value = live ? live.value : entry.value
+        return { id: entry.id, kind, at, value, x: scales.time.map(at), y: scales.value.map(value) }
+      })
+      .sort((a, b) => a.at - b.at),
+  }))
+  const points = seriesByKind.flatMap((series) => series.points)
+  const active = points.find((point) => point.id === (drag?.id ?? selectedId)) ?? null
+
+  function localPoint(event: React.PointerEvent<SVGSVGElement>) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  }
+
+  /** Nearest point within the hit radius, or nothing. */
+  function hitTest(at: { x: number; y: number }): LanePoint | null {
+    let best: LanePoint | null = null
+    let bestDistance = HIT_RADIUS
+
+    for (const point of points) {
+      const distance = Math.hypot(point.x - at.x, point.y - at.y)
+      if (distance <= bestDistance) {
+        best = point
+        bestDistance = distance
+      }
+    }
+    return best
+  }
+
+  function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
+    const at = localPoint(event)
+    const hit = hitTest(at)
+
+    if (!hit) {
+      onSelect(null)
+      return
+    }
+
+    // Capture routes every later event for this pointer here, so a drag that wanders out of the
+    // lane keeps tracking instead of freezing the point mid-correction.
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.currentTarget.focus()
+    onSelect(hit.id)
+    setDrag({
+      pointerId: event.pointerId,
+      id: hit.id,
+      kind: hit.kind,
+      startX: at.x,
+      startY: at.y,
+      moved: false,
+      at: hit.at,
+      value: hit.value,
+    })
+  }
+
+  function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    const at = localPoint(event)
+    // Below the threshold this is still a tap, and the point must not twitch under a fingertip.
+    if (!drag.moved && Math.hypot(at.x - drag.startX, at.y - drag.startY) <= DRAG_THRESHOLD) return
+
+    setDrag({ ...drag, moved: true, ...pointerToMeasurement(at, scales, VITALS[drag.kind].step) })
+  }
+
+  function handlePointerUp(event: React.PointerEvent<SVGSVGElement>) {
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    if (drag.moved) onCorrect(drag.id, { at: drag.at, value: drag.value })
+    setDrag(null)
+  }
+
+  /** A cancelled pointer (a system gesture taking over) discards the correction. */
+  function handlePointerCancel(event: React.PointerEvent<SVGSVGElement>) {
+    if (!drag || drag.pointerId !== event.pointerId) return
+    setDrag(null)
+  }
+
+  /**
+   * Keyboard adjustment of the selected point. This is the precision path: a pointer gets you
+   * close, arrow keys land the exact number, and it is the only way in for anyone not using one.
+   */
+  function handleKeyDown(event: React.KeyboardEvent<SVGSVGElement>) {
+    if (!active) return
+
+    const step = VITALS[active.kind].step
+    const move = (at: Timestamp, value: number) => {
+      event.preventDefault()
+      onCorrect(active.id, {
+        at: clamp(at, window.from, window.to),
+        value: snapToStep(clamp(value, min, max), step),
+      })
+    }
+
+    switch (event.key) {
+      case 'ArrowUp':
+        return move(active.at, active.value + step)
+      case 'ArrowDown':
+        return move(active.at, active.value - step)
+      case 'ArrowLeft':
+        return move(active.at - KEY_TIME_STEP, active.value)
+      case 'ArrowRight':
+        return move(active.at + KEY_TIME_STEP, active.value)
+      case 'Delete':
+      case 'Backspace':
+        event.preventDefault()
+        onRemove(active.id)
+        return onSelect(null)
+      case 'Escape':
+        return onSelect(null)
+    }
+  }
+
   return (
     <svg
       width={width}
       height={height}
       className="timeline__lane"
-      role="img"
-      aria-label={`${lane.label}, Achse von ${min} bis ${max} ${laneUnit(lane)}`}
+      role="group"
+      tabIndex={0}
+      aria-label={`${lane.label}, Achse von ${min} bis ${max} ${laneUnit(lane)}. Punkt auswählen und mit den Pfeiltasten korrigieren.`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onKeyDown={handleKeyDown}
     >
       {/* Value gridlines, recessive: they orient, they are not data. */}
       {valueTicks.map((value) => (
@@ -233,12 +426,36 @@ function VitalLane({ lane, width, window, record, events }: LaneProps) {
       ))}
 
       {lane.id === 'bloodPressure' && (
-        <BloodPressureConnectors record={record} scales={scales} color={color} />
+        <BloodPressureConnectors seriesByKind={seriesByKind} color={color} />
       )}
 
-      {lane.vitals.map((kind) => (
-        <Series key={kind} kind={kind} record={record} scales={scales} color={color} />
+      {seriesByKind.map(({ kind, points: series }) => (
+        <g key={kind}>
+          {series.length > 1 && (
+            <polyline
+              points={series.map((point) => `${point.x},${point.y}`).join(' ')}
+              fill="none"
+              stroke={color}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
+          {series.map((point) => (
+            <Marker
+              key={point.id}
+              id={point.id}
+              kind={kind}
+              x={point.x}
+              y={point.y}
+              color={color}
+            />
+          ))}
+        </g>
       ))}
+
+      {active && <SelectionRing point={active} color={color} dragging={drag?.moved ?? false} />}
+      {active && <Readout point={active} area={area} dragging={drag?.moved ?? false} />}
 
       <line
         x1={area.left}
@@ -254,66 +471,28 @@ function VitalLane({ lane, width, window, record, events }: LaneProps) {
 
 // ---------------------------------------------------------------------------
 
-type Scales = ReturnType<typeof createLaneScales>
-
-/**
- * One vital's points, joined in time order.
- *
- * The marker shape carries which of the three pressures a point is, following the paper protocol:
- * systolic points up, diastolic points down, the mean is a dot. That leaves hue free to mean
- * "which lane", and keeps the three readable for anyone who cannot separate them by colour.
- */
-function Series({
-  kind,
-  record,
-  scales,
-  color,
-}: {
-  kind: VitalKind
-  record: AnesthesiaCase
-  scales: Scales
-  color: string
-}) {
-  const points = vitalSeries(record, kind).map((entry) => ({
-    id: entry.id,
-    x: scales.time.map(entry.at),
-    y: scales.value.map(entry.value),
-  }))
-
-  if (points.length === 0) return null
-
-  return (
-    <g>
-      {points.length > 1 && (
-        <polyline
-          points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      )}
-      {points.map((point) => (
-        <Marker key={point.id} kind={kind} x={point.x} y={point.y} color={color} />
-      ))}
-    </g>
-  )
-}
-
 /** A 2px ring in the surface colour keeps overlapping points from merging into one blob. */
 function Marker({
+  id,
   kind,
   x,
   y,
   color,
 }: {
+  id: string
   kind: VitalKind
   x: number
   y: number
   color: string
 }) {
-  const shared = { fill: color, stroke: chart.surface, strokeWidth: 2 }
+  // Addressable by entry id so a test can drag one specific point and assert what it became.
+  const shared = {
+    'data-entry-id': id,
+    fill: color,
+    stroke: chart.surface,
+    strokeWidth: 2,
+    cursor: 'grab',
+  }
 
   if (kind === 'bloodPressureSystolic') {
     return <path d={`M ${x} ${y - 6} L ${x + 5.5} ${y + 4} L ${x - 5.5} ${y + 4} Z`} {...shared} />
@@ -324,34 +503,113 @@ function Marker({
   return <circle cx={x} cy={y} r={4.5} {...shared} />
 }
 
-/** The vertical stroke joining systolic to diastolic, as drawn on a paper protocol. */
-function BloodPressureConnectors({
-  record,
-  scales,
+function SelectionRing({
+  point,
   color,
+  dragging,
 }: {
-  record: AnesthesiaCase
-  scales: Scales
+  point: LanePoint
   color: string
+  dragging: boolean
 }) {
-  const systolic = vitalSeries(record, 'bloodPressureSystolic')
-  const diastolic = new Map(
-    vitalSeries(record, 'bloodPressureDiastolic').map((entry) => [entry.at, entry.value]),
+  return (
+    <circle
+      cx={point.x}
+      cy={point.y}
+      r={dragging ? 14 : 11}
+      fill="none"
+      stroke={color}
+      strokeWidth={2}
+      opacity={dragging ? 0.9 : 0.6}
+      pointerEvents="none"
+    />
   )
+}
+
+/**
+ * The exact value under the pointer, spelled out.
+ *
+ * Dragging alone cannot promise a specific number — a pixel is worth more than one unit on most
+ * of these axes. Showing the value as it changes is what makes the gesture precise rather than
+ * approximate, and it is why the drag can be coarse and still land on 97 %.
+ */
+function Readout({
+  point,
+  area,
+  dragging,
+}: {
+  point: LanePoint
+  area: { left: number; right: number; top: number; bottom: number }
+  dragging: boolean
+}) {
+  const meta = VITALS[point.kind]
+  const label = `${meta.short} ${formatValue(point.kind, point.value)} ${meta.unit} · ${formatTime(point.at)}`
+  const boxWidth = label.length * 6.6 + 16
+
+  // Anchored to the top edge of the lane rather than trailing the point. A lane is only about 90
+  // pixels tall, so a box that follows the point vertically spends most of its time covering the
+  // trace being corrected; pinning it means the eye always knows where the number is. It drops to
+  // the bottom edge only when the point itself is up there.
+  const nearTop = point.y - area.top < 40
+  const x = clamp(point.x - boxWidth / 2, area.left, Math.max(area.right - boxWidth, area.left))
+  const y = nearTop ? area.bottom - 24 : area.top + 2
 
   return (
-    <g>
-      {systolic.map((entry) => {
-        const low = diastolic.get(entry.at)
-        if (low === undefined) return null
-        const x = scales.time.map(entry.at)
+    <g pointerEvents="none" aria-live="polite">
+      <rect
+        x={x}
+        y={y}
+        width={boxWidth}
+        height={22}
+        rx={4}
+        fill={chart.ink}
+        opacity={dragging ? 0.92 : 0.78}
+      />
+      <text
+        x={x + boxWidth / 2}
+        y={y + 15}
+        fill={chart.surface}
+        fontSize={12}
+        fontWeight={600}
+        textAnchor="middle"
+        style={{ fontVariantNumeric: 'tabular-nums' }}
+      >
+        {label}
+      </text>
+    </g>
+  )
+}
+
+/** The vertical stroke joining systolic to diastolic, as drawn on a paper protocol. */
+function BloodPressureConnectors({
+  seriesByKind,
+  color,
+}: {
+  seriesByKind: Array<{ kind: VitalKind; points: LanePoint[] }>
+  color: string
+}) {
+  const systolic = seriesByKind.find((s) => s.kind === 'bloodPressureSystolic')?.points ?? []
+  const diastolic = seriesByKind.find((s) => s.kind === 'bloodPressureDiastolic')?.points ?? []
+
+  return (
+    <g pointerEvents="none">
+      {systolic.map((high) => {
+        // Pair on nearest time rather than an exact match: once a point has been dragged, the
+        // three pressures no longer share a timestamp.
+        const low = diastolic.reduce<LanePoint | null>((best, candidate) => {
+          if (Math.abs(candidate.at - high.at) > GRID_INTERVAL_MS / 2) return best
+          if (!best) return candidate
+          return Math.abs(candidate.at - high.at) < Math.abs(best.at - high.at) ? candidate : best
+        }, null)
+
+        if (!low) return null
         return (
           <line
-            key={entry.id}
-            x1={x}
-            x2={x}
-            y1={scales.value.map(entry.value)}
-            y2={scales.value.map(low)}
+            key={high.id}
+            x1={high.x}
+            x2={low.x}
+            y1={high.y}
+            y2={low.y}
             stroke={color}
             strokeWidth={2}
             opacity={0.55}
