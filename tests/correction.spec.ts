@@ -133,3 +133,74 @@ test('delete removes a point from the chart but keeps it in the record', async (
   const after = await storedEntry(page, 'demo-heartRate-30')
   expect(after.deletedAt).not.toBeNull()
 })
+
+/**
+ * The readout over a selected point, as the way into that value's entry sheet.
+ *
+ * These are the paths a drag cannot express. Removal above needs a hardware `Delete` key, which an
+ * iPad does not have; the revisions are stored on every correction and were shown nowhere; and an
+ * exact number is a matter of aiming as long as the chart is the only control.
+ */
+const sheet = (page: Page) => page.getByRole('dialog')
+
+/** Selects a point and opens its sheet through the readout. */
+async function openReadout(page: Page, id: string) {
+  const at = await centreOf(page, id)
+  await page.mouse.click(at.x, at.y)
+  await page.locator(`[data-readout="${id}"]`).click()
+  await expect(sheet(page)).toBeVisible()
+}
+
+test('the readout opens the selected value in the entry sheet', async ({ page }) => {
+  await openReadout(page, 'demo-heartRate-30')
+
+  await expect(sheet(page).getByText('Herzfrequenz')).toBeVisible()
+  // The sheet opens on the value that was tapped rather than on a fresh entry.
+  await expect(sheet(page).locator('.value-field__number')).toHaveText('81')
+})
+
+test('a value can be removed from its sheet, with no keyboard involved', async ({ page }) => {
+  await openReadout(page, 'demo-heartRate-30')
+  await sheet(page).getByRole('button', { name: 'Entfernen' }).click()
+
+  await expect(page.locator('[data-entry-id="demo-heartRate-30"]')).toHaveCount(0)
+
+  const after = await storedEntry(page, 'demo-heartRate-30')
+  expect(after.deletedAt).not.toBeNull()
+})
+
+test('the sheet corrects a value to an exact number', async ({ page }) => {
+  await openReadout(page, 'demo-heartRate-30')
+
+  await sheet(page).getByRole('button', { name: 'Herzfrequenz erhöhen' }).click()
+  await sheet(page).getByRole('button', { name: 'Übernehmen' }).click()
+  await expect(sheet(page)).toBeHidden()
+
+  const after = await storedEntry(page, 'demo-heartRate-30')
+  expect(after.value).toBe(82)
+  expect(after.revisions[0].previous.value).toBe(81)
+})
+
+test('the sheet shows what the value was before it was corrected', async ({ page }) => {
+  const from = await centreOf(page, 'demo-heartRate-30')
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x, from.y - 20, { steps: 8 })
+  await page.mouse.up()
+
+  await openReadout(page, 'demo-heartRate-30')
+
+  // The trail is stored on every correction; this is the only place a vital's is legible.
+  await expect(sheet(page).getByText('Änderungen')).toBeVisible()
+  await expect(sheet(page).getByText(/Wert 81/)).toBeVisible()
+})
+
+test('the keyboard reaches the sheet from a selected point', async ({ page }) => {
+  const at = await centreOf(page, 'demo-heartRate-30')
+  await page.mouse.click(at.x, at.y)
+
+  await page.keyboard.press('Enter')
+
+  await expect(sheet(page)).toBeVisible()
+  await expect(sheet(page).getByText('Herzfrequenz')).toBeVisible()
+})

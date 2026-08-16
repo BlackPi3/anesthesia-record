@@ -194,6 +194,25 @@ one keystroke. Looking it up by id each render is one line and cannot go stale.
 
 ---
 
+## 2026-08-16 — A button inside a surface that handles its own presses
+
+The readout is a button drawn inside the lane's `<svg>`, and the lane answers `pointerdown` by
+hit-testing for a point. A press on the readout arrives at both. The lane finds no point under the
+box, clears the selection, and React unmounts the readout — before the browser has finished the
+click it was going to deliver to it. The button would have been unpressable, and nothing in either
+handler would have looked wrong.
+
+**A click is two events with a gap in between, and anything that unmounts the target in that gap
+cancels it.** The lane now checks whether the press landed inside `[data-readout]` and leaves it
+alone. `event.target` is the deepest element hit; `event.currentTarget` is the element whose handler
+is running — the distinction is the whole fix.
+
+The same collision on the keyboard, with the opposite answer: `Enter` on the readout bubbles to the
+lane, which also opens the sheet, so the readout stops it. The arrow keys deliberately keep
+bubbling, because adjusting the point while focus sits on its readout is the useful behaviour.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

@@ -378,6 +378,34 @@ intrusive: in front of someone about to change the entry again.
 
 ---
 
+## 2026-08-16 — The readout over a selected value is also the way into its sheet
+
+**What:** tapping a point on a lane selects it and shows the dark readout, as before. The readout is
+now a button, with a chevron saying so, and it opens that value in the same entry sheet the
+medications and events use.
+
+**Why:** three things a vital needs had no route on a chart. **Removing one** was `Delete` on a
+selected point and nothing else, so a mandatory item was unreachable on the mandatory device — an
+iPad has no `Delete` key. **The revisions** were stored on every correction and shown for
+medications and events only, which made the audit trail clear for two thirds of the record.
+**An exact number** was a matter of aiming as long as the drag and the arrow keys were the only
+controls: the drag is coarse by nature and the arrow keys move one step at a time.
+
+**Why the readout rather than a panel beside the chart:** it is already where the eye is once a
+point is selected, and it already names the entry it belongs to. A separate panel would be a second
+place to look and a second thing to keep in sync with the selection.
+
+**The drag stays exactly as it was.** This is the precise path alongside it, not a replacement, and
+it is for every device: on a desktop the sheet is how a value is set to a specific number without
+aiming, and `Enter` on a selected point is the keyboard's way in — the first keyboard route into the
+entry flow the app has had.
+
+**Not a new sheet.** `EditEntry` already handled a vital draft, already offered `Entfernen` and
+already listed the revisions, because a vital was always one of the four drafts the form knows. What
+was missing was a caller.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures

@@ -77,6 +77,8 @@ const HOLD_MS = 250
 const HOLD_SLOP = 10
 /** One arrow-key press along the time axis. */
 const KEY_TIME_STEP = 60_000
+/** Space kept clear at the right of the readout for the chevron that says it opens the sheet. */
+const CHEVRON_ROOM = 18
 
 // ---------------------------------------------------------------------------
 
@@ -84,7 +86,7 @@ export interface TimelineProps {
   record: AnesthesiaCase
   onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
   onRemove: (id: string) => void
-  /** Asks for an entry to be opened for editing. Used by the bands, which have no drag gesture. */
+  /** Asks for an entry to be opened for editing: the bands' only route in, and a vital's readout. */
   onEdit: (id: string) => void
 }
 
@@ -111,6 +113,7 @@ export function Timeline({ record, onCorrect, onRemove, onEdit }: TimelineProps)
               onSelect={setSelectedId}
               onCorrect={onCorrect}
               onRemove={onRemove}
+              onEdit={onEdit}
             />
           ))}
           <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
@@ -220,6 +223,7 @@ interface LaneProps {
   onSelect: (id: string | null) => void
   onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
   onRemove: (id: string) => void
+  onEdit: (id: string) => void
 }
 
 function VitalLane({
@@ -232,6 +236,7 @@ function VitalLane({
   onSelect,
   onCorrect,
   onRemove,
+  onEdit,
 }: LaneProps) {
   const [drag, setDrag] = useState<Drag | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -332,6 +337,12 @@ function VitalLane({
   }
 
   function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
+    // The readout is a button drawn inside the lane, so a press on it arrives here first. Left
+    // alone, the hit test would find no point under the box, deselect, and unmount the very button
+    // that was pressed before its click could fire. The press belongs to the button; the chart
+    // below it sees nothing.
+    if (event.target instanceof Element && event.target.closest('[data-readout]')) return
+
     const at = localPoint(event)
     const hit = hitTest(at)
 
@@ -443,6 +454,12 @@ function VitalLane({
         return move(active.at - KEY_TIME_STEP, active.value)
       case 'ArrowRight':
         return move(active.at + KEY_TIME_STEP, active.value)
+      case 'Enter':
+      case ' ':
+        // The keyboard's way into the entry sheet, and with it the exact-number path: the arrow
+        // keys walk a value one step at a time, which is the wrong tool for a wide correction.
+        event.preventDefault()
+        return onEdit(active.id)
       case 'Delete':
       case 'Backspace':
         event.preventDefault()
@@ -461,7 +478,7 @@ function VitalLane({
       className={grabbed ? 'timeline__lane timeline__lane--grabbed' : 'timeline__lane'}
       role="group"
       tabIndex={0}
-      aria-label={`${lane.label}, Achse von ${min} bis ${max} ${laneUnit(lane)}. Punkt auswählen und mit den Pfeiltasten korrigieren.`}
+      aria-label={`${lane.label}, Achse von ${min} bis ${max} ${laneUnit(lane)}. Punkt auswählen und mit den Pfeiltasten korrigieren, mit der Eingabetaste bearbeiten.`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -559,7 +576,7 @@ function VitalLane({
       ))}
 
       {active && <SelectionRing point={active} color={color} grabbed={grabbed} />}
-      {active && <Readout point={active} area={area} grabbed={grabbed} />}
+      {active && <Readout point={active} area={area} grabbed={grabbed} onEdit={onEdit} />}
 
       <line
         x1={area.left}
@@ -636,24 +653,33 @@ function SelectionRing({
 }
 
 /**
- * The exact value under the pointer, spelled out.
+ * The exact value under the pointer, spelled out, and the way into that value's entry sheet.
  *
  * Dragging alone cannot promise a specific number — a pixel is worth more than one unit on most
  * of these axes. Showing the value as it changes is what makes the gesture precise rather than
  * approximate, and it is why the drag can be coarse and still land on 97 %.
+ *
+ * It is also a button, because three things a vital needs have no gesture on the chart: removing
+ * it without a hardware `Delete` key, reading what it was before it was corrected, and changing it
+ * to an exact number without aiming. The readout is where the eye already is once a point is
+ * selected, so it is the honest place to put them — a second control elsewhere would be a second
+ * thing to find. The chevron is there to say it opens something; a box that only prints a number
+ * gives no reason to press it.
  */
 function Readout({
   point,
   area,
   grabbed,
+  onEdit,
 }: {
   point: LanePoint
   area: { left: number; right: number; top: number; bottom: number }
   grabbed: boolean
+  onEdit: (id: string) => void
 }) {
   const meta = VITALS[point.kind]
   const label = `${meta.short} ${formatValue(point.kind, point.value)} ${meta.unit} · ${formatTime(point.at)}`
-  const boxWidth = label.length * 6.6 + 16
+  const boxWidth = label.length * 6.6 + 16 + CHEVRON_ROOM
 
   // Anchored to the top edge of the lane rather than trailing the point. A lane is only about 90
   // pixels tall, so a box that follows the point vertically spends most of its time covering the
@@ -662,9 +688,31 @@ function Readout({
   const nearTop = point.y - area.top < 40
   const x = clamp(point.x - boxWidth / 2, area.left, Math.max(area.right - boxWidth, area.left))
   const y = nearTop ? area.bottom - 24 : area.top + 2
+  const chevronX = x + boxWidth - CHEVRON_ROOM + 2
+  const middle = y + 11
 
+  // The hook is `data-readout`, not `data-entry-id`: the marker for this same entry already
+  // carries that one, and a second element answering to it would make every "the point with this
+  // id" lookup ambiguous the moment the point is selected.
   return (
-    <g pointerEvents="none" aria-live="polite">
+    <g
+      className="timeline__readout"
+      data-readout={point.id}
+      role="button"
+      tabIndex={0}
+      aria-label={`${label}. Eintrag bearbeiten.`}
+      aria-live="polite"
+      onClick={() => onEdit(point.id)}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        // The lane behind offers the same key, so without this the sheet would be asked for twice.
+        // The arrow keys are deliberately left to bubble: focus sits here once the readout is
+        // reached, and adjusting the point from there is the useful thing to be able to do.
+        event.stopPropagation()
+        onEdit(point.id)
+      }}
+    >
       <rect
         x={x}
         y={y}
@@ -675,7 +723,7 @@ function Readout({
         opacity={grabbed ? 0.92 : 0.78}
       />
       <text
-        x={x + boxWidth / 2}
+        x={x + (boxWidth - CHEVRON_ROOM) / 2}
         y={y + 15}
         fill={chart.surface}
         fontSize={12}
@@ -685,6 +733,15 @@ function Readout({
       >
         {label}
       </text>
+      <path
+        d={`M ${chevronX} ${middle - 4} L ${chevronX + 4} ${middle} L ${chevronX} ${middle + 4}`}
+        fill="none"
+        stroke={chart.surface}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.85}
+      />
     </g>
   )
 }
