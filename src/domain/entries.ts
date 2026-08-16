@@ -14,6 +14,33 @@ import type {
   VitalKind,
 } from './types'
 
+/**
+ * Longest a case is assumed to run. Only used to decide whether the wall clock still belongs to
+ * this case; nothing is validated or rejected against it.
+ */
+const CASE_MAX_DURATION = 12 * 60 * 60_000
+
+/**
+ * The time a new entry should default to: "now", as the case understands it.
+ *
+ * A live case wants the wall clock, which is how OR documentation actually works — you write the
+ * value down as it happens. But the demo case is pinned to a fixed date so the chart, the
+ * screenshots and the Playwright assertions see the same case every run, and once that date is in
+ * the past the wall clock is not a time in this case at all. Defaulting to it would place the new
+ * entry days after everything else, and `caseTimeWindow` would stretch the axis to reach it,
+ * squashing the entire record against the left edge.
+ *
+ * So the wall clock is used while it falls inside the case, and otherwise the entry defaults to
+ * the end of what has been documented. The user can still move it; this only decides where the
+ * control opens.
+ */
+export function caseNow(record: AnesthesiaCase, now: Timestamp = Date.now()): Timestamp {
+  if (now >= record.startedAt && now <= record.startedAt + CASE_MAX_DURATION) return now
+
+  const times = visibleEntries(record).flatMap(entryTimes)
+  return times.length > 0 ? Math.max(...times) : record.startedAt
+}
+
 /** Entries that were removed stay in the record for the audit trail, but are not drawn. */
 export function isVisible(entry: Entry): boolean {
   return entry.deletedAt === null

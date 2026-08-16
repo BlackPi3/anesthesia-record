@@ -81,7 +81,183 @@ body {
 
 .app__main {
   flex: 1;
-  padding: 16px 20px 32px;
+  /* Bottom padding clears the floating entry button, so the last lane is never sitting under it. */
+  padding: 16px 20px 104px;
+}
+
+/* --- Entry -------------------------------------------------------------- */
+
+/*
+ * The entry button floats over the record rather than sitting in the header. It is the one action
+ * taken repeatedly, often one-handed, and the bottom corner is where a thumb already rests when
+ * an iPad is held or propped.
+ */
+.app__actions {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 3;
+}
+
+.add-vital__open {
+  height: 56px;
+  padding-inline: 24px;
+  border-radius: 28px;
+  font-size: 16px;
+  box-shadow: 0 6px 20px rgb(11 11 11 / 22%);
+}
+
+.add-vital__body,
+.add-vital__footer {
+  /* The sheet spans the window, the content does not: a value control stretched across a desktop
+     monitor puts its two ends a head-turn apart. */
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.add-vital__body {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-block: 8px 16px;
+}
+
+.add-vital__footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.metric-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.metric-picker__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 88px;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  /* The lane colour, as an edge rather than a fill. Two of the four fall below 3:1 against the
+     surface, so it stays an aid to recognition and never the thing that identifies the tile. */
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.metric-picker__item:hover {
+  border-color: #184f95;
+  border-left-color: var(--accent);
+}
+
+.metric-picker__item:focus-visible {
+  outline: 2px solid #184f95;
+  outline-offset: 2px;
+}
+
+.metric-picker__short {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-picker__label {
+  font-size: 13px;
+  color: #52514e;
+}
+
+.metric-picker__unit {
+  font-size: 12px;
+  color: #898781;
+}
+
+/*
+ * The readout is the largest thing in the sheet on purpose. It is the only element that promises
+ * the exact number being stored, and it has to be legible at arm's length, from an iPad propped
+ * across a workstation, without leaning in.
+ */
+.value-field__readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+
+.value-field__number {
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.value-field__unit {
+  font-size: 20px;
+  color: #52514e;
+}
+
+.value-field__controls {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.value-field__step {
+  min-width: 64px;
+  height: 56px;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.value-field__bounds {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 80px 0;
+  font-size: 12px;
+  color: #898781;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-field {
+  border-top: 1px solid var(--hairline);
+  padding-top: 20px;
+}
+
+.time-field__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.time-field__caption {
+  font-size: 13px;
+  color: #898781;
+}
+
+.time-field__clock {
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-field__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.time-field__steps .ant-btn {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
 }
 
 .timeline {

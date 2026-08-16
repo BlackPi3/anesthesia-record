@@ -16,7 +16,8 @@ import { Alert, Typography } from 'antd'
 
 import { CaseHeader } from './CaseHeader'
 import { createDemoCase } from './domain/demoCase'
-import { correctVital, removeEntry } from './domain/mutations'
+import { AddVital } from './entry/AddVital'
+import { addVital, correctVital, removeEntry } from './domain/mutations'
 import { loadCase, saveCase } from './domain/storage'
 import type { AnesthesiaCase } from './domain/types'
 import { Timeline } from './timeline/Timeline'
@@ -77,6 +78,9 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
           onRemove={(id) => update(removeEntry(record, id))}
         />
       </main>
+      <div className="app__actions">
+        <AddVital record={record} onAdd={(draft) => update(addVital(record, draft))} />
+      </div>
     </div>
   )
 }

@@ -93,6 +93,39 @@ ask what would still make it pass if the feature were deleted.**
 
 ---
 
+## 2026-08-16 — A bug that only appears when the calendar moves
+
+The entry flow defaults its timestamp to "now". That was correct when written and wrong four days
+later, and nothing in the code changed in between.
+
+The demo case is pinned to 12.08. `Date.now()` on 16.08 is a time four days after everything in
+the record, so the first entry created would have pushed `caseTimeWindow` out to reach it and
+squashed the entire case into the left few pixels of the axis. Not a crash, no failing test — just
+a chart that quietly stopped being readable, and only for someone running the app on a later date
+than the one it was written on.
+
+The lesson is about the shape of the bug rather than the fix: **`Date.now()` is an input, and code
+that reads it has a hidden dependency on when it runs.** The fix, `caseNow`, takes `now` as a
+parameter with a default, which is the same thing `mutations.ts` already does for the audit trail
+and for the same reason — a value the test can pin is a value that cannot drift.
+
+Caught by opening the app and looking at it, not by a test. It joins the four layout defects as
+evidence for the same rule.
+
+## 2026-08-16 — A test that failed for a reason that was not a bug
+
+The end-to-end test that creates a value and then drags it on the chart failed: the drag changed
+nothing. The coordinate maths was fine, the drag handler was fine.
+
+The drawer's mask is still over the chart for the length of its close animation. The test clicked
+"Übernehmen" and started dragging immediately, so the pointer landed on the mask instead of the
+lane. Waiting for the dialog to be hidden fixed it.
+
+Worth keeping for two reasons. First, "the test fails" and "the app is broken" are different
+claims, and the gap between them is where a lot of time goes. Second, the fix belongs in the test
+rather than the app: a close animation is normal, and removing it to make a test pass would be
+letting the test design the product.
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

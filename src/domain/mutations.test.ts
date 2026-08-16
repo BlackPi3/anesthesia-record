@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { correctVital, removeEntry, restoreEntry } from './mutations'
+import { addVital, correctVital, removeEntry, restoreEntry } from './mutations'
+import { vitalSeries } from './entries'
 import type { AnesthesiaCase, VitalEntry } from './types'
 
 const AT = new Date('2026-08-12T08:40:00').getTime()
@@ -40,6 +41,50 @@ function caseWith(...entries: AnesthesiaCase['entries']): AnesthesiaCase {
     entries,
   }
 }
+
+describe('addVital', () => {
+  it('writes the measurement with an empty audit trail', () => {
+    const next = addVital(caseWith(), { vital: 'spo2', at: AT, value: 98 }, NOW, 'new-1')
+    const entry = next.entries[0] as VitalEntry
+
+    expect(entry).toMatchObject({
+      id: 'new-1',
+      type: 'vital',
+      vital: 'spo2',
+      at: AT,
+      value: 98,
+      deletedAt: null,
+      revisions: [],
+    })
+  })
+
+  it('separates the clinical time from the time it was written down', () => {
+    // Documenting at 09:05 a measurement taken at 08:40 is normal in an OR; the two times are
+    // different facts and both are kept.
+    const next = addVital(caseWith(), { vital: 'heartRate', at: AT, value: 72 }, NOW, 'new-1')
+    const entry = next.entries[0] as VitalEntry
+
+    expect(entry.at).toBe(AT)
+    expect(entry.recordedAt).toBe(NOW)
+  })
+
+  it('leaves the existing entries alone', () => {
+    const record = caseWith(vital())
+    const next = addVital(record, { vital: 'spo2', at: AT, value: 91 }, NOW, 'new-1')
+
+    expect(next.entries).toHaveLength(2)
+    expect(next.entries[0]).toBe(record.entries[0])
+    expect(record.entries).toHaveLength(1)
+  })
+
+  it('sorts a back-dated entry into the series despite being appended last', () => {
+    // `entries` carries no order, so an entry timestamped before an existing one must still come
+    // out in the right place. This is the guarantee that lets creation just append.
+    const record = addVital(caseWith(vital()), { vital: 'spo2', at: AT - 60_000, value: 99 }, NOW, 'new-1')
+
+    expect(vitalSeries(record, 'spo2').map((entry) => entry.id)).toEqual(['new-1', 'v1'])
+  })
+})
 
 describe('correctVital', () => {
   it('applies the new value and records what it was before', () => {

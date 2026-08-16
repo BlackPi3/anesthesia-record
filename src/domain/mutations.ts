@@ -9,7 +9,18 @@
  * timestamp written into the audit trail.
  */
 
-import type { AnesthesiaCase, Entry, Timestamp } from './types'
+import type { AnesthesiaCase, Entry, Timestamp, VitalKind } from './types'
+
+/**
+ * Identifier for a newly created entry.
+ *
+ * Ids only have to be unique inside one case held in one browser, so a UUID is more than enough
+ * and needs no counter kept in the record. The demo case writes readable ids of its own
+ * (`demo-spo2-15`), which is why nothing here parses an id or infers anything from its shape.
+ */
+export function newEntryId(): string {
+  return crypto.randomUUID()
+}
 
 /**
  * Replaces one entry, and returns the original case untouched if nothing actually changed.
@@ -32,6 +43,43 @@ function replaceEntry(
   })
 
   return changed ? { ...record, entries } : record
+}
+
+/**
+ * Writes a new vital measurement into the record.
+ *
+ * `at` is the clinical time of the measurement and `recordedAt` is when it was typed in. They are
+ * the same at creation and diverge as soon as the entry is corrected, which is exactly the
+ * distinction the audit trail exists to keep.
+ *
+ * No range checking happens here, for the same reason `correctVital` does none: the value control
+ * cannot produce a number outside the metric's `inputRange`, and a domain function that silently
+ * clamped would turn a UI bug into a quietly wrong record instead of a visible one.
+ *
+ * `id` is a parameter so a test can assert the entry it just created rather than hunting for it.
+ */
+export function addVital(
+  record: AnesthesiaCase,
+  draft: { vital: VitalKind; at: Timestamp; value: number },
+  now: Timestamp = Date.now(),
+  id: string = newEntryId(),
+): AnesthesiaCase {
+  return {
+    ...record,
+    entries: [
+      ...record.entries,
+      {
+        id,
+        type: 'vital',
+        vital: draft.vital,
+        at: draft.at,
+        value: draft.value,
+        recordedAt: now,
+        deletedAt: null,
+        revisions: [],
+      },
+    ],
+  }
 }
 
 /**

@@ -236,15 +236,61 @@ merged view added later needs to be reachable in one action from the entry layou
 
 ---
 
+## 2026-08-16 — Value control: large readout, stepper buttons, coarse track
+
+**What:** The value step of the entry flow is a large numeric readout above a row of
+`−` / track / `+`. The buttons move by the metric's `step` from `catalog.ts`; the track covers its
+whole `inputRange` for coarse movement. The readout names the exact value at all times.
+
+**Why:** This follows directly from what the drag correction taught. A pixel is worth more than
+one unit on most of these axes, so no continuous gesture is precise by itself; what makes a
+gesture exact is pairing something coarse to get close with something discrete to land, and
+naming the number throughout. That pairing is the design, and the same reasoning already governs
+the timeline (drag plus arrow keys plus readout). Being exact by construction also means no
+separate precision fallback has to be invented.
+
+The `−` / `+` buttons are 64 × 56 px and the slider handle and rail are themed up from AntD's
+defaults, which are mouse-era sizes. The readout is the largest element in the sheet because it is
+the only one that promises what will actually be stored.
+
+**Why the track is AntD's `Slider` and not hand-rolled:** the graded pointer work is the timeline,
+where the inverse mapping genuinely does not exist off the shelf. A one-dimensional value track is
+exactly what a slider is, and hand-rolling it would have meant rebuilding keyboard support and ARIA
+semantics that already work. `clamp` and `snapToStep` still come from `timeline/scales.ts` rather
+than being written again, so a value entered here and a value dragged on the chart round
+identically — otherwise correcting a point could change it without the user asking.
+
+**Rejected:** A rotating wheel (closest to the original sketch and the best-feeling option, but
+momentum and snapping are real pointer work, it is the hardest to make accessible, and it still
+needs steppers or keys as the precision path — strictly more work, not less). Tapping the lane to
+place a point and then dragging it (cheapest by far and the most literal reading of "enter values
+directly into the curve", but every stray tap on a lane would create an entry, which is wrong in
+an OR, and the Blutdruck lane holds three kinds so a tap there cannot say which was meant).
+
+**Two steps, not one form:** the sheet opens on the metric grid and replaces it with the value
+control. Picking the metric is a glance-and-tap decision and setting the value is a careful one;
+showing both at once makes the careful half compete with a choice already finished with.
+
+---
+
+## 2026-08-16 — "Now" is resolved against the case, not the wall clock
+
+**What:** A new entry's timestamp defaults to `caseNow(record)`: the wall clock while it falls
+inside the case, and otherwise the end of what has already been documented.
+
+**Why:** The demo case is pinned to a fixed date so the chart, the screenshots and the Playwright
+assertions see the same case every run. Once that date is in the past, `Date.now()` is not a time
+in this case at all. Defaulting to it would place a new entry days after everything else, and
+`caseTimeWindow` would stretch the axis to reach it, squashing the whole record against the left
+edge. This only decides where the control opens; the timestamp is adjustable either way.
+
+**Rejected:** Making the demo case relative to `Date.now()` (would have cost the reproducibility
+the fixed dates exist for). Silently clamping the entry into the case window (would store a time
+the user did not choose, which is the one thing a record must never do).
+
+---
+
 ## Open decisions (not yet made)
 
-- **Value-selection control**: scrollable/rotatable "wheel" vs. a plain tappable list of values.
-  Both keep the same "+", pick metric, pick value flow — differ in how the value step feels and
-  how precise it is. **Decided by building:** the timeline and a first version of the control come
-  first, and this gets settled on the working thing rather than in the abstract.
-- **Desktop/mouse input mapping** for the value control: click-drag, scroll wheel, and/or
-  keyboard arrows all proposed, not yet finalized in detail.
-- **Precision fallback**: how to guarantee landing an exact number (e.g. large live numeric
-  readout while scrubbing, or direct numeric entry) when scrubbing/swiping alone isn't precise
-  enough.
-- **NiBP grouped rendering** on the timeline (see above).
+- **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures
+  are three trips through the same flow, sharing nothing but a timestamp the user sets.

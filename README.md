@@ -24,11 +24,14 @@ Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprot
 
 ## Status
 
-The problem scope, the core interaction model, and the data model are settled. The domain layer
-exists: case and entry types, the vital/event catalogue with its German labels and ranges, the
-local-storage persistence layer, and a fictional demo case. The timeline's coordinate maths and
-lane layout are in place and unit-tested. Next is drawing the lanes and wiring pointer input to
-them.
+Vitals can be recorded, drawn, corrected and removed, and the record survives a reload. The domain
+layer holds the case and entry types, the vital/event catalogue with its German labels and ranges,
+the local-storage persistence layer, and a fictional demo case. The timeline draws one lane per
+vital parameter with medications and events beneath, and a point can be dragged to correct its
+value and time. Entry runs through the "+" sheet described below.
+
+Next: entering medications and phase events through the same flow, and a list view that surfaces
+the audit trail.
 
 This README grows alongside the build; sections appear as the thing they describe does.
 
@@ -121,6 +124,33 @@ separation against the surface. Two of them fall below 3:1 contrast, so identity
 hue: every lane carries a permanent text label, and within the Blutdruck lane the three pressures
 are told apart by marker shape (systolic points up, diastolic down, the mean is a dot) as on the
 paper protocol.
+
+## Entering a value
+
+`src/entry/` holds the creation flow. A floating "+ Wert erfassen" button opens a sheet in two
+steps: the six metrics as a grid of large tiles, then the value control for the one chosen. Each
+tile carries the colour of the lane the point will be drawn in, as an edge rather than a fill, so
+the choice made here and the mark that appears on the chart are visibly the same thing.
+
+The value control is a large readout above `−` / track / `+`. The buttons move by the metric's
+step, the track spans its whole input range for coarse movement, and the readout names the exact
+value throughout. That pairing is deliberate and comes from the drag correction: a pixel is worth
+more than one unit on most of these axes, so a continuous gesture cannot promise a specific
+number on its own. Something coarse to get close, something discrete to land, and the number
+spelled out the whole time is what makes either interaction exact. `clamp` and `snapToStep` are
+shared with the timeline's scale maths, so a value entered and a value dragged round identically.
+
+The value opens on the last reading for that metric rather than the middle of the scale. Vitals
+move gradually, so the previous value is usually a step or two from the new one.
+
+The timestamp defaults to now and is adjustable in whole minutes, which is the resolution a
+protocol is read at; anything finer is available afterwards by dragging the point along the time
+axis. "Now" is resolved against the case rather than the wall clock — the demo case is pinned to a
+fixed date for reproducibility, and once that date is past, the wall clock is not a time in the
+case (`caseNow` in `src/domain/entries.ts`).
+
+Blood pressure stays three separate entries, each its own trip through the flow, per the data
+model decision above.
 
 ## Setup
 
