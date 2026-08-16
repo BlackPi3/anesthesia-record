@@ -61,6 +61,44 @@ test('reports a clear error when the stored case is corrupt', async ({ page }) =
   await expect(page.getByText(/beschädigt/)).toBeVisible()
 })
 
+test('says so when the record holds nothing yet', async ({ page }) => {
+  // Emptied through the app's own stored envelope rather than a hand-written one, so the test
+  // cannot pass against a storage format the app no longer writes.
+  await page.evaluate(() => {
+    const key = 'anesthesia-record:case'
+    const envelope = JSON.parse(window.localStorage.getItem(key)!)
+    envelope.case.entries = []
+    window.localStorage.setItem(key, JSON.stringify(envelope))
+  })
+  await page.reload()
+
+  await expect(page.getByText('Noch keine Einträge')).toBeVisible()
+  await expect(page.getByText(/Erfassen“ aufnehmen/)).toBeVisible()
+
+  // The lanes stay: an empty record is the chart before anything is written on it, not a
+  // different screen.
+  await expect(page.getByRole('group', { name: /Herzfrequenz, Achse/ })).toBeVisible()
+})
+
+test('the message goes as soon as there is something to show', async ({ page }) => {
+  await page.evaluate(() => {
+    const key = 'anesthesia-record:case'
+    const envelope = JSON.parse(window.localStorage.getItem(key)!)
+    envelope.case.entries = []
+    window.localStorage.setItem(key, JSON.stringify(envelope))
+  })
+  await page.reload()
+  await expect(page.getByText('Noch keine Einträge')).toBeVisible()
+
+  await page.getByRole('button', { name: /Erfassen/ }).click()
+  const sheet = page.getByRole('dialog')
+  await sheet.getByRole('button', { name: /^Ereignis/ }).click()
+  await sheet.getByRole('button', { name: 'Narkosebeginn' }).click()
+  await sheet.getByRole('button', { name: 'Übernehmen' }).click()
+
+  await expect(page.getByText('Noch keine Einträge')).toBeHidden()
+})
+
 test('does not scroll sideways at either form factor', async ({ page }) => {
   const overflows = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

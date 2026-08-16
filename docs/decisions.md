@@ -434,6 +434,30 @@ nothing to undo. A reload is where the record stands as documented.
 
 ---
 
+## 2026-08-16 — An empty record keeps its chart and says it is empty
+
+**What:** a record with no visible entries draws the lanes exactly as it always does, with a short
+message written across the middle: *Noch keine Einträge*, and where to start.
+
+**Why the lanes stay:** the axis, the four parameter names and their value ranges are what this
+record is going to be. A blank grid with a caption reads as ready. A panel that replaced the chart
+would read as a different screen, and the transition to the first entry would be a jump rather than
+a value appearing where the message said it would.
+
+**Why over the chart and not beside it:** four empty lanes and no words is the shape a failed load
+has, and someone deciding which of the two they are looking at is someone not documenting. The
+message goes where the eye lands.
+
+**Not AntD's `Empty`.** Its illustration would announce the component library on the emptiest screen
+in the app, which is the one place there is nothing else to look at.
+
+**It carries its own surface.** Written directly onto the chart the text crossed gridlines and the
+boundary between two lanes, and a deliberate message that overlaps the furniture reads as a layout
+accident. It also passes the pointer through: nothing in it is pressable, and the control it names
+is the entry button.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures

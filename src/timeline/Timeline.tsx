@@ -28,7 +28,7 @@ import {
   laneRange,
   laneUnit,
 } from '../domain/catalog'
-import { medications, phaseEvents, vitalSeries } from '../domain/entries'
+import { medications, phaseEvents, visibleEntries, vitalSeries } from '../domain/entries'
 import type { AnesthesiaCase, PhaseEventEntry, Timestamp, VitalKind } from '../domain/types'
 import type { LaneDef } from '../domain/catalog'
 import { formatTime, formatNumber, formatValue } from '../format'
@@ -118,8 +118,37 @@ export function Timeline({ record, onCorrect, onRemove, onEdit }: TimelineProps)
           ))}
           <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
           <EventBand width={width} window={window} events={events} onEdit={onEdit} />
+          {visibleEntries(record).length === 0 && <EmptyRecord />}
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * A record with nothing in it yet.
+ *
+ * The lanes stay: the axis, the value ranges and the parameter names are what the chart is going to
+ * be, and a blank grid with a caption reads as ready, where a replaced panel would read as a
+ * different screen. Written over them rather than beside them so the eye lands on it — four empty
+ * lanes with no explanation is the shape a failed load has, and that guess costs seconds.
+ *
+ * Not AntD's `Empty`, whose illustration would announce the component library on the emptiest
+ * screen in the app. It also passes the pointer straight through: there is nothing to press here,
+ * and the entry button is the thing this text is pointing at.
+ */
+function EmptyRecord() {
+  return (
+    <div className="timeline__empty" role="status">
+      {/* The text carries its own surface. Written straight onto the chart it crossed the
+          gridlines and the boundary between two lanes, which made a deliberate message look like
+          an accident of layout. */}
+      <div className="timeline__empty-card">
+        <p className="timeline__empty-title">Noch keine Einträge</p>
+        <p className="timeline__empty-hint">
+          Werte, Medikamente und Ereignisse über „+ Erfassen“ aufnehmen.
+        </p>
+      </div>
     </div>
   )
 }

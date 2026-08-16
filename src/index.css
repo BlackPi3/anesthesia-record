@@ -359,6 +359,47 @@ body {
   padding: 12px 16px;
   /* The timeline owns its width; nothing inside may push the page sideways. */
   overflow-x: hidden;
+  /* The anchor the empty-record message centres itself against. */
+  position: relative;
+}
+
+/*
+ * The empty record, written across the middle of the lanes. It sits over the grid rather than
+ * replacing it, and lets every pointer through: there is nothing here to press, and the control it
+ * names is the entry button.
+ */
+.timeline__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  padding: 0 16px;
+}
+
+.timeline__empty-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 20px 28px;
+}
+
+.timeline__empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0b0b0b;
+}
+
+.timeline__empty-hint {
+  margin: 0;
+  font-size: 14px;
+  color: #52514e;
 }
 
 .timeline__lane + .timeline__lane,
