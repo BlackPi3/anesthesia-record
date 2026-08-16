@@ -323,6 +323,61 @@ attached by hand instead of as a JSX prop.
 
 ---
 
+## 2026-08-16 — One entry flow for three kinds of entry, in three steps
+
+**What:** The "+" opens a three-way choice (Wert / Medikament / Ereignis), then the picker for that
+kind, then the form. Medications choose Bolus or Dauerinfusion before the drug, since that decides
+whether the form asks for a dose or a rate.
+
+**Why the extra step:** a single flat chooser holding six metrics, eleven drugs and five milestones
+is one screen the user has to read rather than aim at, and it grows every time the catalog does.
+Splitting it keeps the first screen at three large targets and lets each picker look like what it
+is picking — metrics carry their lane colour, drugs do not. The cost is one tap per entry, paid on
+every entry including the time-critical ones. Parham chose this over the flat grid after both were
+laid out.
+
+**Rejected:** One sectioned grid, everything at today's depth (shorter for the user, longer to read,
+and the sections would have to be scrolled past on an iPad). Three separate floating buttons
+(fewest taps, but three permanent buttons over the record in the corner where a thumb rests).
+
+**Amounts open on the last one recorded for the same metric or drug**, which is the same rule the
+vitals already used, extended to doses. Where the case holds nothing to copy, the amount opens at
+zero and the sheet will not save it. **No default dose is invented** — a plausible starting number
+is a dosing suggestion, which the brief rules out, and the disabled save button says so honestly.
+
+**Units are never converted with the unit picker.** 200 mg and 200 µg are different doses, and
+rescaling one into the other would be the app changing a documented dose on the user's behalf.
+
+---
+
+## 2026-08-16 — Medications and events are corrected in a sheet, not by dragging
+
+**What:** Tapping a bolus, an infusion or a milestone in the bands reopens it in the entry sheet,
+prefilled, with `Entfernen` in the footer. Vitals keep the drag gesture.
+
+**Why:** a drag can only express time. A medication is a drug, a dose, a unit and a time, and three
+of those four have no position on a chart, so extending the drag would have solved a quarter of the
+problem and still needed a sheet for the rest. Reopening the form the entry was written in also
+means creating and correcting look the same, which is one interaction to learn rather than two.
+
+Ending an infusion falls out of this for free: it is the same sheet, setting the end time. That is
+also why `correctInfusion` handles stopping rather than a separate `endInfusion` — the record then
+shows when the end was documented as well as when it happened.
+
+**The hit targets are the whole row**, not the drawn mark. A bolus is a 10px dot on a five-hour
+axis; the row it sits in is the width of the screen and belongs to exactly one entry.
+
+**They use `onClick`, not `onPointerDown`,** which is why the bands needed no equivalent of the
+lanes' press-and-hold. A browser withholds the click when a touch turns into a scroll, so a swipe
+starting on a medication row scrolls and opens nothing. The ambiguity the lanes had to resolve by
+hand is already resolved for a tap.
+
+**The audit trail is shown here**, under the form, listing what the entry was before each
+correction. The brief asks for a *clear* trail, and this is where it is most useful and least
+intrusive: in front of someone about to change the entry again.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures

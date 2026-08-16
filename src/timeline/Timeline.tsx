@@ -11,8 +11,11 @@
  * read without leaving the entry layout. That is the cheap half of the merged reading view
  * deferred in docs/decisions.md.
  *
- * Correction is the interaction here: press a point, drag it, release. Creation via the "+" flow
- * is separate and still to come.
+ * Two ways in, because the two halves of the chart are not the same kind of thing. A vital is a
+ * number on an axis, so it is corrected where it is: press the point, drag it, release. A
+ * medication or a milestone is a drug, a dose, a unit and a time, none of which a drag can
+ * express, so the bands hand their entries to the entry sheet instead. Creation for all of them
+ * runs through the "+" flow.
  */
 
 import { Fragment, useEffect, useRef, useState } from 'react'
@@ -51,8 +54,10 @@ const RIGHT_PAD = 24
 const LANE_INSET = 12
 const LANE_BASE_HEIGHT = 92
 const AXIS_HEIGHT = 30
-const MED_ROW_HEIGHT = 26
+const MED_ROW_HEIGHT = 34
 const EVENT_ROW_HEIGHT = 34
+/** Width of a milestone's hit area, sized to the label beside it rather than to the dot. */
+const EVENT_HIT_WIDTH = 138
 
 /**
  * How close a pointer must be to a point to grab it, in pixels. 22 gives a 44px target, the size
@@ -79,9 +84,11 @@ export interface TimelineProps {
   record: AnesthesiaCase
   onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
   onRemove: (id: string) => void
+  /** Asks for an entry to be opened for editing. Used by the bands, which have no drag gesture. */
+  onEdit: (id: string) => void
 }
 
-export function Timeline({ record, onCorrect, onRemove }: TimelineProps) {
+export function Timeline({ record, onCorrect, onRemove, onEdit }: TimelineProps) {
   const [ref, width] = useElementWidth<HTMLDivElement>()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const window = caseTimeWindow(record)
@@ -106,8 +113,8 @@ export function Timeline({ record, onCorrect, onRemove }: TimelineProps) {
               onRemove={onRemove}
             />
           ))}
-          <MedicationBand width={width} window={window} record={record} />
-          <EventBand width={width} window={window} events={events} />
+          <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
+          <EventBand width={width} window={window} events={events} onEdit={onEdit} />
         </>
       )}
     </div>
@@ -724,14 +731,66 @@ function BloodPressureConnectors({
 
 // ---------------------------------------------------------------------------
 
+/**
+ * An invisible target over something drawn in a band, opening it for editing.
+ *
+ * `onClick` rather than `onPointerDown`, deliberately, and it is why the bands needed no equivalent
+ * of the lanes' press-and-hold. A browser withholds the click when a touch turns into a scroll, so
+ * a swipe that happens to start on a medication row scrolls and opens nothing — the ambiguity the
+ * lanes had to resolve by hand is already resolved here.
+ *
+ * `role="button"` and a tab stop because an SVG rect is not one: without them these would be
+ * reachable by finger and mouse only, and the entries in the bands are exactly the ones with no
+ * other route in.
+ */
+function HitArea({
+  x,
+  y,
+  width,
+  height,
+  label,
+  entryId,
+  onEdit,
+}: {
+  x: number
+  y: number
+  width: number
+  height: number
+  label: string
+  entryId: string
+  onEdit: (id: string) => void
+}) {
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      className="timeline__hit"
+      data-entry-id={entryId}
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      onClick={() => onEdit(entryId)}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onEdit(entryId)
+      }}
+    />
+  )
+}
+
 function MedicationBand({
   width,
   window,
   record,
+  onEdit,
 }: {
   width: number
   window: TimeWindow
   record: AnesthesiaCase
+  onEdit: (id: string) => void
 }) {
   const rows = medications(record)
   if (rows.length === 0) return null
@@ -748,7 +807,7 @@ function MedicationBand({
       width={width}
       height={height}
       className="timeline__band"
-      role="img"
+      role="group"
       aria-label="Medikamente und Infusionen"
     >
       <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
@@ -771,6 +830,13 @@ function MedicationBand({
             : Math.max(scale.map(entry.endedAt ?? window.to), start + 4)
         // Flip the dose to the left of the mark when it would run off the right edge.
         const flip = end + 90 > width - RIGHT_PAD
+
+        const summary =
+          entry.type === 'bolus'
+            ? `${entry.drug}, Bolus ${dose}, ${formatTime(entry.at)}`
+            : `${entry.drug}, Dauerinfusion ${dose}, ab ${formatTime(entry.startedAt)}${
+                entry.endedAt === null ? ', läuft' : ` bis ${formatTime(entry.endedAt)}`
+              }`
 
         return (
           <Fragment key={entry.id}>
@@ -815,6 +881,20 @@ function MedicationBand({
             >
               {dose}
             </text>
+
+            {/* Last, so it sits above the row's own ink: an SVG element painted later is the one
+                that receives the pointer, and a bar drawn over this rect would swallow the tap.
+                One row is one entry, so the whole row is the target — on an iPad that is a band
+                the width of the screen rather than a 10px dot on a five-hour axis. */}
+            <HitArea
+              x={0}
+              y={y - MED_ROW_HEIGHT / 2}
+              width={width}
+              height={MED_ROW_HEIGHT}
+              label={`${summary}. Bearbeiten.`}
+              entryId={entry.id}
+              onEdit={onEdit}
+            />
           </Fragment>
         )
       })}
@@ -830,10 +910,12 @@ function EventBand({
   width,
   window,
   events,
+  onEdit,
 }: {
   width: number
   window: TimeWindow
   events: PhaseEventEntry[]
+  onEdit: (id: string) => void
 }) {
   if (events.length === 0) return null
 
@@ -845,7 +927,13 @@ function EventBand({
   ).time
 
   return (
-    <svg width={width} height={height} className="timeline__band" role="img" aria-label="Ereignisse">
+    <svg
+      width={width}
+      height={height}
+      className="timeline__band"
+      role="group"
+      aria-label="Ereignisse"
+    >
       <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
         Ereignisse
       </text>
@@ -882,6 +970,18 @@ function EventBand({
             >
               {formatTime(event.at)}
             </text>
+
+            {/* Last, and sized to the label rather than the dot: the words are what the eye and
+                the finger both go to, and the dot alone is an 8px target. */}
+            <HitArea
+              x={flip ? labelX - EVENT_HIT_WIDTH : labelX - 16}
+              y={y - 6}
+              width={EVENT_HIT_WIDTH}
+              height={EVENT_ROW_HEIGHT}
+              label={`${PHASE_EVENTS[event.event].label}, ${formatTime(event.at)}. Bearbeiten.`}
+              entryId={event.id}
+              onEdit={onEdit}
+            />
           </Fragment>
         )
       })}

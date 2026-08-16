@@ -30,8 +30,10 @@ test('draws one lane per vital parameter plus the bands', async ({ page }) => {
     await expect(page.getByRole('group', { name: label })).toBeVisible()
   }
 
-  await expect(page.getByRole('img', { name: 'Medikamente und Infusionen' })).toBeVisible()
-  await expect(page.getByRole('img', { name: 'Ereignisse' })).toBeVisible()
+  // The bands are groups rather than images: each row is a control that opens the entry for
+  // editing, so they hold interactive children and are no longer a picture of the data.
+  await expect(page.getByRole('group', { name: 'Medikamente und Infusionen' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Ereignisse' })).toBeVisible()
   await expect(page.getByRole('img', { name: /Zeitachse von/ })).toBeVisible()
 })
 

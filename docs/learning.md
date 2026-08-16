@@ -158,6 +158,42 @@ React clears it after dispatch. The hold path reads the element through a ref in
 
 ---
 
+## 2026-08-16 — In SVG, the last thing drawn is the thing you click
+
+The medication and event bands got invisible `<rect>` targets so a row could be tapped to edit it.
+They were rendered first in each row, before the drug name, the bar and the dose. Clicking a bolus
+worked. Clicking an infusion did nothing at all.
+
+SVG has no `z-index`: elements paint in document order, later on top of earlier. The infusion's bar
+is drawn after the target, so it sat over it and received every click. A bolus dot is small enough
+that the click usually landed on bare target instead, which is why half the band appeared to work
+and made the cause harder to see, not easier.
+
+Moving the target to the end of the row fixed it. The general lesson is that in SVG, stacking and
+hit-testing are the same question and both are answered by document order — so "an invisible layer
+over the row" has to be literally last, not merely conceptually on top.
+
+Found by clicking, not by reading. The handler, the coordinates and the `role="button"` were all
+correct, and nothing about the source suggested a problem.
+
+## 2026-08-16 — A component that mounts fresh needs no effect to stay in sync
+
+The edit sheet has to show the entry that was tapped. The obvious way is one long-lived sheet with
+`useEffect` copying the selected entry into a draft whenever it changes. That is the pattern that
+ends up showing one entry's values under another entry's name, because there is a render between
+the prop changing and the effect running.
+
+The sheet is instead rendered only while something is being edited, and keyed on that entry's id.
+Changing the key unmounts one sheet and mounts another, so the draft comes from
+`useState(() => draftFrom(entry))` and there is no window in which the two disagree. **Remounting
+is state synchronisation, done by React rather than by hand.**
+
+The related habit: the entry being edited is held in `App` as an **id, not an object**. A
+correction produces a whole new case, so a stored entry object would be the pre-edit version within
+one keystroke. Looking it up by id each render is one line and cannot go stale.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

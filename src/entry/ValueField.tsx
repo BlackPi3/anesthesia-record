@@ -11,6 +11,10 @@
  * given. The parent owns the number, which is what lets the same control serve entry now and
  * correction later without either of them holding a second, drifting copy.
  *
+ * It takes an `AmountMeta` rather than a `VitalKind`, so a dose and an infusion rate get the same
+ * control as a saturation. They are the same problem — a number in a range, moved coarsely and
+ * then landed exactly — and the reasoning above applies to all three unchanged.
+ *
  * `clamp` and `snapToStep` come from the timeline's scale maths deliberately, rather than being
  * written again here. A value typed in and a value dragged on the chart must round identically —
  * if they did not, correcting a point could change it without the user asking.
@@ -18,20 +22,19 @@
 
 import { Button, Slider } from 'antd'
 
-import { VITALS } from '../domain/catalog'
-import type { VitalKind } from '../domain/types'
-import { formatNumber, formatValue } from '../format'
+import type { AmountMeta } from '../domain/catalog'
+import { formatNumber } from '../format'
 import { clamp, snapToStep } from '../timeline/scales'
 
 export interface ValueFieldProps {
-  kind: VitalKind
+  /** What is being set: its name, unit, range and step. */
+  amount: AmountMeta
   value: number
   onChange: (value: number) => void
 }
 
-export function ValueField({ kind, value, onChange }: ValueFieldProps) {
-  const meta = VITALS[kind]
-  const [min, max] = meta.inputRange
+export function ValueField({ amount: meta, value, onChange }: ValueFieldProps) {
+  const { min, max } = meta
 
   function nudge(direction: number) {
     onChange(snapToStep(clamp(value + direction * meta.step, min, max), meta.step))
@@ -42,7 +45,7 @@ export function ValueField({ kind, value, onChange }: ValueFieldProps) {
       {/* `output` is the element for a value the interface computed, and it announces changes to
           a screen reader without a live region of our own. */}
       <output className="value-field__readout" htmlFor="value-field-slider">
-        <span className="value-field__number">{formatValue(kind, value)}</span>
+        <span className="value-field__number">{formatNumber(value, meta.decimals)}</span>
         <span className="value-field__unit">{meta.unit}</span>
       </output>
 

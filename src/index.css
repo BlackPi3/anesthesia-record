@@ -99,7 +99,7 @@ body {
   z-index: 3;
 }
 
-.add-vital__open {
+.add-entry__open {
   height: 56px;
   padding-inline: 24px;
   border-radius: 28px;
@@ -107,34 +107,34 @@ body {
   box-shadow: 0 6px 20px rgb(11 11 11 / 22%);
 }
 
-.add-vital__body,
-.add-vital__footer {
+.entry-sheet__body,
+.entry-sheet__footer {
   /* The sheet spans the window, the content does not: a value control stretched across a desktop
      monitor puts its two ends a head-turn apart. */
   max-width: 640px;
   margin: 0 auto;
 }
 
-.add-vital__body {
+.entry-sheet__body {
   display: flex;
   flex-direction: column;
   gap: 32px;
   padding-block: 8px 16px;
 }
 
-.add-vital__footer {
+.entry-sheet__footer {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
 }
 
-.metric-picker {
+.picker {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
 }
 
-.metric-picker__item {
+.picker__tile {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -144,36 +144,43 @@ body {
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--hairline);
-  /* The lane colour, as an edge rather than a fill. Two of the four fall below 3:1 against the
-     surface, so it stays an aid to recognition and never the thing that identifies the tile. */
-  border-left: 4px solid var(--accent);
+  border-left: 4px solid var(--hairline);
   border-radius: 8px;
   cursor: pointer;
   font: inherit;
 }
 
-.metric-picker__item:hover {
-  border-color: #184f95;
+/* The lane colour, as an edge rather than a fill. Two of the four fall below 3:1 against the
+   surface, so it stays an aid to recognition and never the thing that identifies the tile. */
+.picker__tile--accented {
   border-left-color: var(--accent);
 }
 
-.metric-picker__item:focus-visible {
+.picker__tile:hover {
+  border-color: #184f95;
+}
+
+.picker__tile--accented:hover {
+  border-left-color: var(--accent);
+}
+
+.picker__tile:focus-visible {
   outline: 2px solid #184f95;
   outline-offset: 2px;
 }
 
-.metric-picker__short {
+.picker__lead {
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.metric-picker__label {
+.picker__label {
   font-size: 13px;
   color: #52514e;
 }
 
-.metric-picker__unit {
+.picker__note {
   font-size: 12px;
   color: #898781;
 }
@@ -226,9 +233,94 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The unit belongs beside the number it applies to, so the caption sits inline rather than above. */
+.unit-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.unit-picker__caption {
+  font-size: 13px;
+  color: #898781;
+}
+
+.other-drug__row {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.other-drug__input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 16px;
+}
+
+.other-drug__input:focus-visible {
+  outline: 2px solid #184f95;
+  outline-offset: 1px;
+}
+
 .time-field {
   border-top: 1px solid var(--hairline);
   padding-top: 20px;
+}
+
+/* A running infusion has no end time to print, and the word has to read as a state rather than
+   as a missing value. */
+.time-field__clock--running {
+  font-size: 20px;
+  font-weight: 500;
+  color: #52514e;
+}
+
+/*
+ * The audit trail, shown where a correction is about to be made. Recessive on purpose: it is
+ * context for the change, not the subject of the screen.
+ */
+.history {
+  border-top: 1px solid var(--hairline);
+  padding-top: 16px;
+}
+
+.history__caption {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #52514e;
+}
+
+.history__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history__item {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: #52514e;
+}
+
+.history__time {
+  color: #898781;
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-sheet__spacer {
+  flex: 1;
 }
 
 .time-field__head {
@@ -301,6 +393,27 @@ body {
 
 .timeline__lane--grabbed {
   touch-action: none;
+}
+
+/*
+ * The targets over the medication and event bands. Invisible until focused: the row already shows
+ * what it is, and a box drawn around every entry would add ink to the densest part of the chart
+ * for no information. Focus is the exception, where the ring is the only thing saying where you
+ * are.
+ */
+.timeline__hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.timeline__hit:hover {
+  fill: rgb(11 11 11 / 4%);
+}
+
+.timeline__hit:focus-visible {
+  fill: rgb(24 79 149 / 8%);
+  outline: 2px solid #184f95;
+  outline-offset: -2px;
 }
 
 /* Lanes are keyboard-reachable, so the focus ring has to be real and visible. */

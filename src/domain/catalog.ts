@@ -11,7 +11,7 @@
  * chart window. Neither is a clinical judgement, and nothing here interprets a value.
  */
 
-import type { PhaseEventKind, VitalKind } from './types'
+import type { BolusUnit, InfusionRateUnit, PhaseEventKind, VitalKind } from './types'
 
 export interface VitalMeta {
   /** Full German name, for labels and screen readers. */
@@ -141,6 +141,68 @@ export const FLUIDS = ['Ringer-Acetat', 'NaCl 0,9 %', 'Glucose 5 %'] as const
 
 /** Gridline spacing on the time axis, in milliseconds. Reference only, entries are not snapped. */
 export const GRID_INTERVAL_MS = 5 * 60 * 1000
+
+// ---------------------------------------------------------------------------
+// Amounts
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything the value control needs to display and step one quantity.
+ *
+ * A saturation, a dose and an infusion rate are the same problem for the control — a number in a
+ * range, moved coarsely and then exactly — so they describe themselves the same way and share one
+ * component rather than growing three near-identical ones.
+ */
+export interface AmountMeta {
+  /** What the quantity is called, used for the controls' screen-reader labels. */
+  label: string
+  unit: string
+  min: number
+  max: number
+  step: number
+  decimals: number
+}
+
+export function vitalAmount(kind: VitalKind): AmountMeta {
+  const meta = VITALS[kind]
+  const [min, max] = meta.inputRange
+  return { label: meta.label, unit: meta.unit, min, max, step: meta.step, decimals: meta.decimals }
+}
+
+/** The part of an `AmountMeta` that depends on the unit rather than on what is being measured. */
+type UnitRange = Pick<AmountMeta, 'max' | 'step' | 'decimals'>
+
+/**
+ * How far the dose control reaches, per unit.
+ *
+ * These bound the control and nothing else. They are deliberately far wider than anything
+ * ordinarily given, for the same reason a vital's `inputRange` is wider than its `plotRange`: the
+ * record has to be able to document what actually happened, including the unusual. No number here
+ * is a recommended dose and nothing in the app reads it as one.
+ */
+const BOLUS_RANGES: Record<BolusUnit, UnitRange> = {
+  mg: { max: 2000, step: 1, decimals: 0 },
+  µg: { max: 2000, step: 5, decimals: 0 },
+  ml: { max: 1000, step: 5, decimals: 0 },
+  IE: { max: 20000, step: 100, decimals: 0 },
+}
+
+const INFUSION_RANGES: Record<InfusionRateUnit, UnitRange> = {
+  'mg/h': { max: 1000, step: 1, decimals: 0 },
+  'µg/kg/min': { max: 50, step: 0.05, decimals: 2 },
+  'ml/h': { max: 1000, step: 10, decimals: 0 },
+}
+
+export const BOLUS_UNITS = Object.keys(BOLUS_RANGES) as BolusUnit[]
+export const INFUSION_UNITS = Object.keys(INFUSION_RANGES) as InfusionRateUnit[]
+
+export function bolusAmount(unit: BolusUnit): AmountMeta {
+  return { label: 'Dosis', unit, min: 0, ...BOLUS_RANGES[unit] }
+}
+
+export function infusionAmount(unit: InfusionRateUnit): AmountMeta {
+  return { label: 'Rate', unit, min: 0, ...INFUSION_RANGES[unit] }
+}
 
 // ---------------------------------------------------------------------------
 // Lanes

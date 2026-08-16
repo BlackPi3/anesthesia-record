@@ -16,8 +16,10 @@ import { Alert, Typography } from 'antd'
 
 import { CaseHeader } from './CaseHeader'
 import { createDemoCase } from './domain/demoCase'
-import { AddVital } from './entry/AddVital'
-import { addVital, correctVital, removeEntry } from './domain/mutations'
+import { AddEntry } from './entry/AddEntry'
+import { EditEntry } from './entry/EditEntry'
+import { addDraft, correctDraft } from './entry/draft'
+import { correctVital, removeEntry } from './domain/mutations'
 import { loadCase, saveCase } from './domain/storage'
 import type { AnesthesiaCase } from './domain/types'
 import { Timeline } from './timeline/Timeline'
@@ -67,6 +69,10 @@ export default function App() {
  */
 function OpenCase({ initial }: { initial: AnesthesiaCase }) {
   const { record, save, update } = useCase(initial)
+  // The entry being edited is held by id rather than as an object. A correction produces a new
+  // case, so a stored entry would be the version from before the edit within one keystroke.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const editing = record.entries.find((entry) => entry.id === editingId) ?? null
 
   return (
     <div className="app">
@@ -76,11 +82,25 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
           record={record}
           onCorrect={(id, next) => update(correctVital(record, id, next))}
           onRemove={(id) => update(removeEntry(record, id))}
+          onEdit={setEditingId}
         />
       </main>
       <div className="app__actions">
-        <AddVital record={record} onAdd={(draft) => update(addVital(record, draft))} />
+        <AddEntry record={record} onAdd={(draft) => update(addDraft(record, draft))} />
       </div>
+
+      {editing !== null && (
+        // Keyed on the entry so the sheet mounts fresh for each one and seeds its draft from
+        // props, with no effect copying one into the other. See EditEntry.
+        <EditEntry
+          key={editing.id}
+          record={record}
+          entry={editing}
+          onCorrect={(id, draft) => update(correctDraft(record, id, draft))}
+          onRemove={(id) => update(removeEntry(record, id))}
+          onClose={() => setEditingId(null)}
+        />
+      )}
     </div>
   )
 }

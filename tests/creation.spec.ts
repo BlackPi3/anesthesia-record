@@ -27,7 +27,8 @@ async function storedVitals(page: Page, kind: string) {
 
 /** Opens the sheet and picks a metric, leaving the value step on screen. */
 async function openEntry(page: Page, metric: RegExp) {
-  await page.getByRole('button', { name: /Wert erfassen/ }).click()
+  await page.getByRole('button', { name: /Erfassen/ }).click()
+  await page.getByRole('button', { name: 'Wert Vitalparameter' }).click()
   await page.getByRole('button', { name: metric }).click()
 }
 
