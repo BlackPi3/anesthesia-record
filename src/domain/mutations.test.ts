@@ -1,8 +1,25 @@
 import { describe, expect, it } from 'vitest'
 
-import { addVital, correctVital, removeEntry, restoreEntry } from './mutations'
+import {
+  addBolus,
+  addEvent,
+  addInfusion,
+  addVital,
+  correctBolus,
+  correctEvent,
+  correctInfusion,
+  correctVital,
+  removeEntry,
+  restoreEntry,
+} from './mutations'
 import { vitalSeries } from './entries'
-import type { AnesthesiaCase, VitalEntry } from './types'
+import type {
+  AnesthesiaCase,
+  BolusEntry,
+  InfusionEntry,
+  PhaseEventEntry,
+  VitalEntry,
+} from './types'
 
 const AT = new Date('2026-08-12T08:40:00').getTime()
 const NOW = new Date('2026-08-12T09:05:00').getTime()
@@ -170,5 +187,192 @@ describe('restoreEntry', () => {
   it('is a no-op on an entry that was never removed', () => {
     const record = caseWith(vital())
     expect(restoreEntry(record, 'v1')).toBe(record)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Medications and events
+// ---------------------------------------------------------------------------
+
+function bolus(overrides: Partial<BolusEntry> = {}): BolusEntry {
+  return {
+    id: 'b1',
+    type: 'bolus',
+    drug: 'Propofol',
+    at: AT,
+    dose: 200,
+    unit: 'mg',
+    recordedAt: AT,
+    deletedAt: null,
+    revisions: [],
+    ...overrides,
+  }
+}
+
+function infusion(overrides: Partial<InfusionEntry> = {}): InfusionEntry {
+  return {
+    id: 'i1',
+    type: 'infusion',
+    drug: 'Remifentanil',
+    startedAt: AT,
+    endedAt: null,
+    rate: 0.2,
+    unit: 'µg/kg/min',
+    recordedAt: AT,
+    deletedAt: null,
+    revisions: [],
+    ...overrides,
+  }
+}
+
+describe('addBolus', () => {
+  it('writes the dose with an empty audit trail', () => {
+    const next = addBolus(
+      caseWith(),
+      { drug: 'Fentanyl', at: AT, dose: 100, unit: 'µg' },
+      NOW,
+      'new-b',
+    )
+
+    expect(next.entries[0]).toMatchObject({
+      id: 'new-b',
+      type: 'bolus',
+      drug: 'Fentanyl',
+      at: AT,
+      dose: 100,
+      unit: 'µg',
+      recordedAt: NOW,
+      deletedAt: null,
+      revisions: [],
+    })
+  })
+
+  it('accepts a drug that is not in the catalog', () => {
+    const next = addBolus(caseWith(), { drug: 'Sugammadex', at: AT, dose: 200, unit: 'mg' }, NOW)
+    expect((next.entries[0] as BolusEntry).drug).toBe('Sugammadex')
+  })
+})
+
+describe('addInfusion', () => {
+  it('starts an infusion with no end', () => {
+    const next = addInfusion(
+      caseWith(),
+      { drug: 'Ringer-Acetat', startedAt: AT, endedAt: null, rate: 500, unit: 'ml/h' },
+      NOW,
+      'new-i',
+    )
+
+    expect(next.entries[0]).toMatchObject({
+      id: 'new-i',
+      type: 'infusion',
+      startedAt: AT,
+      endedAt: null,
+      rate: 500,
+      revisions: [],
+    })
+  })
+})
+
+describe('addEvent', () => {
+  it('records the milestone', () => {
+    const next = addEvent(caseWith(), { event: 'incision', at: AT }, NOW, 'new-e')
+    expect(next.entries[0]).toMatchObject({ id: 'new-e', type: 'event', event: 'incision', at: AT })
+  })
+
+  it('allows the same milestone twice, since a case can be cut and sutured more than once', () => {
+    const once = addEvent(caseWith(), { event: 'incision', at: AT }, NOW, 'e1')
+    const twice = addEvent(once, { event: 'incision', at: AT + 600_000 }, NOW, 'e2')
+
+    expect(twice.entries).toHaveLength(2)
+  })
+})
+
+describe('correctBolus', () => {
+  it('records every changed field as it was before', () => {
+    const next = correctBolus(
+      caseWith(bolus()),
+      'b1',
+      { at: AT + 60_000, drug: 'Propofol', dose: 150, unit: 'mg' },
+      NOW,
+    )
+    const entry = next.entries[0] as BolusEntry
+
+    expect(entry.dose).toBe(150)
+    expect(entry.at).toBe(AT + 60_000)
+    expect(entry.revisions).toEqual([
+      { revisedAt: NOW, previous: { at: AT, drug: 'Propofol', dose: 200, unit: 'mg' } },
+    ])
+  })
+
+  it('writes no revision when nothing actually changed', () => {
+    const record = caseWith(bolus())
+    expect(correctBolus(record, 'b1', { at: AT, drug: 'Propofol', dose: 200, unit: 'mg' }, NOW))
+      .toBe(record)
+  })
+
+  it('refuses to correct an entry that is not a bolus', () => {
+    const record = caseWith(infusion())
+    expect(correctBolus(record, 'i1', { at: AT, drug: 'X', dose: 1, unit: 'mg' }, NOW)).toBe(record)
+  })
+})
+
+describe('correctInfusion', () => {
+  it('stops a running infusion and keeps the open end in the trail', () => {
+    const stoppedAt = AT + 30 * 60_000
+    const next = correctInfusion(
+      caseWith(infusion()),
+      'i1',
+      { startedAt: AT, endedAt: stoppedAt, drug: 'Remifentanil', rate: 0.2, unit: 'µg/kg/min' },
+      NOW,
+    )
+    const entry = next.entries[0] as InfusionEntry
+
+    expect(entry.endedAt).toBe(stoppedAt)
+    expect(entry.revisions[0].previous.endedAt).toBeNull()
+  })
+
+  it('treats a rate change as a correction', () => {
+    const next = correctInfusion(
+      caseWith(infusion()),
+      'i1',
+      { startedAt: AT, endedAt: null, drug: 'Remifentanil', rate: 0.3, unit: 'µg/kg/min' },
+      NOW,
+    )
+
+    expect((next.entries[0] as InfusionEntry).rate).toBe(0.3)
+    expect(next.entries[0].revisions[0].previous).toMatchObject({ rate: 0.2 })
+  })
+
+  it('writes no revision when nothing actually changed', () => {
+    const record = caseWith(infusion())
+    const same = { startedAt: AT, endedAt: null, drug: 'Remifentanil', rate: 0.2, unit: 'µg/kg/min' } as const
+    expect(correctInfusion(record, 'i1', same, NOW)).toBe(record)
+  })
+})
+
+describe('correctEvent', () => {
+  it('moves the milestone and records when it was', () => {
+    const record = caseWith({
+      id: 'e1',
+      type: 'event',
+      event: 'incision',
+      at: AT,
+      recordedAt: AT,
+      deletedAt: null,
+      revisions: [],
+    })
+    const next = correctEvent(record, 'e1', { at: AT + 120_000 }, NOW)
+
+    expect((next.entries[0] as PhaseEventEntry).at).toBe(AT + 120_000)
+    expect(next.entries[0].revisions).toEqual([{ revisedAt: NOW, previous: { at: AT } }])
+  })
+})
+
+describe('removing medications and events', () => {
+  it('keeps a removed dose in the record', () => {
+    const next = removeEntry(caseWith(bolus()), 'b1', NOW)
+
+    expect(next.entries).toHaveLength(1)
+    expect(next.entries[0].deletedAt).toBe(NOW)
   })
 })

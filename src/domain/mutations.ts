@@ -9,7 +9,19 @@
  * timestamp written into the audit trail.
  */
 
-import type { AnesthesiaCase, Entry, Timestamp, VitalKind } from './types'
+import type {
+  AnesthesiaCase,
+  BolusEntry,
+  BolusUnit,
+  Entry,
+  InfusionEntry,
+  InfusionRateUnit,
+  PhaseEventEntry,
+  PhaseEventKind,
+  Timestamp,
+  VitalEntry,
+  VitalKind,
+} from './types'
 
 /**
  * Identifier for a newly created entry.
@@ -44,6 +56,24 @@ function replaceEntry(
 
   return changed ? { ...record, entries } : record
 }
+
+/**
+ * Whether every field a correction would write already holds that value.
+ *
+ * A correction that changes nothing is not a correction and must write no revision, or every
+ * stray tap would add a line to the audit trail and bury the real ones. Each entry type corrects
+ * a different set of fields, so the comparison is driven by the keys of the incoming values
+ * rather than written out per type.
+ */
+function unchanged<Fields extends object>(entry: Fields, next: Fields): boolean {
+  return (Object.keys(next) as (keyof Fields)[]).every((key) => entry[key] === next[key])
+}
+
+/** The fields a correction may change, per entry type. */
+type VitalFields = Pick<VitalEntry, 'at' | 'value'>
+type BolusFields = Pick<BolusEntry, 'at' | 'drug' | 'dose' | 'unit'>
+type InfusionFields = Pick<InfusionEntry, 'startedAt' | 'endedAt' | 'drug' | 'rate' | 'unit'>
+type EventFields = Pick<PhaseEventEntry, 'at'>
 
 /**
  * Writes a new vital measurement into the record.
@@ -83,30 +113,172 @@ export function addVital(
 }
 
 /**
- * Moves a vital entry to a new time and value, recording what it was before.
+ * Writes a single dose into the record.
  *
- * A correction that lands on the identical time and value is not a correction, and writes no
- * revision — otherwise every stray tap would add a line to the audit trail and make the real
- * corrections harder to find.
+ * `drug` is free text rather than a member of `DRUGS`: the catalog is a shortcut for the common
+ * cases, and a record that cannot document an unlisted drug is worse than one that accepts a
+ * typo. Nothing here checks the dose against the drug — that would be dosing guidance, which the
+ * brief rules out.
  */
+export function addBolus(
+  record: AnesthesiaCase,
+  draft: { drug: string; at: Timestamp; dose: number; unit: BolusUnit },
+  now: Timestamp = Date.now(),
+  id: string = newEntryId(),
+): AnesthesiaCase {
+  return {
+    ...record,
+    entries: [
+      ...record.entries,
+      { id, type: 'bolus', ...draft, recordedAt: now, deletedAt: null, revisions: [] },
+    ],
+  }
+}
+
+/**
+ * Starts a continuous infusion. `endedAt` is null while it runs, and stays null until someone
+ * stops it — an infusion with no end is a real state during a case, not missing data.
+ */
+export function addInfusion(
+  record: AnesthesiaCase,
+  draft: {
+    drug: string
+    startedAt: Timestamp
+    endedAt: Timestamp | null
+    rate: number
+    unit: InfusionRateUnit
+  },
+  now: Timestamp = Date.now(),
+  id: string = newEntryId(),
+): AnesthesiaCase {
+  return {
+    ...record,
+    entries: [
+      ...record.entries,
+      { id, type: 'infusion', ...draft, recordedAt: now, deletedAt: null, revisions: [] },
+    ],
+  }
+}
+
+/**
+ * Records a phase milestone. The same kind may legitimately appear more than once — a case can be
+ * cut and sutured twice — so nothing here rejects a duplicate.
+ */
+export function addEvent(
+  record: AnesthesiaCase,
+  draft: { event: PhaseEventKind; at: Timestamp },
+  now: Timestamp = Date.now(),
+  id: string = newEntryId(),
+): AnesthesiaCase {
+  return {
+    ...record,
+    entries: [
+      ...record.entries,
+      { id, type: 'event', ...draft, recordedAt: now, deletedAt: null, revisions: [] },
+    ],
+  }
+}
+
+/** Moves a vital entry to a new time and value, recording what it was before. */
 export function correctVital(
   record: AnesthesiaCase,
   id: string,
-  next: { at: Timestamp; value: number },
+  next: VitalFields,
   now: Timestamp = Date.now(),
 ): AnesthesiaCase {
   return replaceEntry(record, id, (entry) => {
     if (entry.type !== 'vital') return entry
-    if (entry.at === next.at && entry.value === next.value) return entry
+    if (unchanged(entry, next)) return entry
 
     return {
       ...entry,
-      at: next.at,
-      value: next.value,
+      ...next,
       revisions: [
         ...entry.revisions,
         { revisedAt: now, previous: { at: entry.at, value: entry.value } },
       ],
+    }
+  })
+}
+
+/** Corrects a dose: its time, the drug, the amount or the unit. */
+export function correctBolus(
+  record: AnesthesiaCase,
+  id: string,
+  next: BolusFields,
+  now: Timestamp = Date.now(),
+): AnesthesiaCase {
+  return replaceEntry(record, id, (entry) => {
+    if (entry.type !== 'bolus') return entry
+    if (unchanged(entry, next)) return entry
+
+    return {
+      ...entry,
+      ...next,
+      revisions: [
+        ...entry.revisions,
+        {
+          revisedAt: now,
+          previous: { at: entry.at, drug: entry.drug, dose: entry.dose, unit: entry.unit },
+        },
+      ],
+    }
+  })
+}
+
+/**
+ * Corrects an infusion, including stopping one that is still running. Ending an infusion is a
+ * correction like any other rather than its own operation: it writes the same revision, so the
+ * record shows when the end was documented as well as when it happened.
+ */
+export function correctInfusion(
+  record: AnesthesiaCase,
+  id: string,
+  next: InfusionFields,
+  now: Timestamp = Date.now(),
+): AnesthesiaCase {
+  return replaceEntry(record, id, (entry) => {
+    if (entry.type !== 'infusion') return entry
+    if (unchanged(entry, next)) return entry
+
+    return {
+      ...entry,
+      ...next,
+      revisions: [
+        ...entry.revisions,
+        {
+          revisedAt: now,
+          previous: {
+            startedAt: entry.startedAt,
+            endedAt: entry.endedAt,
+            drug: entry.drug,
+            rate: entry.rate,
+            unit: entry.unit,
+          },
+        },
+      ],
+    }
+  })
+}
+
+/**
+ * Corrects when a milestone happened. The kind itself is not correctable: an incision recorded as
+ * a suture is the wrong entry, not a mistimed one, and removing it leaves the clearer trail.
+ */
+export function correctEvent(
+  record: AnesthesiaCase,
+  id: string,
+  next: EventFields,
+  now: Timestamp = Date.now(),
+): AnesthesiaCase {
+  return replaceEntry(record, id, (entry) => {
+    if (entry.type !== 'event') return entry
+    if (unchanged(entry, next)) return entry
+
+    return {
+      ...entry,
+      ...next,
+      revisions: [...entry.revisions, { revisedAt: now, previous: { at: entry.at } }],
     }
   })
 }
