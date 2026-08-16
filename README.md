@@ -24,14 +24,25 @@ Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprot
 
 ## Status
 
-Vitals can be recorded, drawn, corrected and removed, and the record survives a reload. The domain
-layer holds the case and entry types, the vital/event catalogue with its German labels and ranges,
-the local-storage persistence layer, and a fictional demo case. The timeline draws one lane per
-vital parameter with medications and events beneath, and a point can be dragged to correct its
-value and time. Entry runs through the "+" sheet described below.
+Everything the record holds can be written, corrected and removed, and the case survives a reload.
 
-Next: entering medications and phase events through the same flow, and a list view that surfaces
-the audit trail.
+- **Recording** runs through one "+" flow for all three kinds of entry: a value, a medication or
+  fluid, a phase event. Kind first, then a picker, then the form.
+- **Vitals** are drawn as one lane per parameter over a shared time axis. A point is corrected by
+  dragging it, by arrow keys once selected, or by opening it in the entry sheet from its readout.
+  On a touchscreen a swipe scrolls the record and a press and hold is what moves a value.
+- **Medications, fluids and phase events** are corrected by tapping them in their band, which
+  reopens the sheet they were written in. Ending a running infusion is the same sheet.
+- **The audit trail** is kept on every entry and shown in the sheet, in front of whoever is about
+  to correct the entry again.
+- **Undo** takes back the last change, from the header or with `Ctrl`/`Cmd`+`Z`.
+- **Saving** is immediate and confirmed in the header. A record with nothing in it says so.
+
+The domain layer holds the case and entry types, the vital/event catalogue with its German labels
+and ranges, the local-storage persistence layer, and a fictional demo case.
+
+53 unit tests cover the domain layer and the timeline's coordinate maths. 127 Playwright tests run
+across desktop Chrome, an iPad-sized viewport with touch, and WebKit.
 
 This README grows alongside the build; sections appear as the thing they describe does.
 
