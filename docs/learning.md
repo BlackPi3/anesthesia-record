@@ -256,6 +256,61 @@ scrolled from one that did not. That gap is honest and stays named in the README
 
 ---
 
+## 2026-08-16 — Layout that must not collide is a search, not an offset
+
+Writing every value next to its point looked like arithmetic: put the number seven pixels above the
+marker. It is not, and the two things that break it are the two things this chart is made of. A
+blood pressure measurement is three values on one timestamp, eleven to twenty-one pixels apart on a
+lane a hundred pixels tall, so "above" is the same place three times. A dense series puts
+neighbouring points closer together than their labels are wide, so "above" is also the neighbour's
+place.
+
+What replaced it: each label has eight candidate positions in preference order, and takes the first
+that overlaps nothing already placed and stays inside the lane. Where nothing is free it takes the
+position with the smallest overlap rather than being dropped — **in a clinical record a number drawn
+over a gridline is a worse-looking number, and a number silently omitted is a missing measurement.**
+Those are not the same kind of failure and the code should not treat them as one.
+
+Two general points worth keeping:
+
+- **It went in `labels.ts`, not in the component**, for the same reason `scales.ts` exists: it is
+  geometry, it has no React in it, and twelve tests can state exactly what it promises ("no two
+  labels of one measurement overlap") in numbers. Placement bugs are invisible when read and obvious
+  when measured.
+- **Greedy first-fit is enough here.** A real optimiser would place all fifty-one labels at once and
+  minimise total overlap. Left to right, first fit, has a property that matters more: correcting one
+  point cannot reshuffle the labels of the points before it, so the lane reads the same way after an
+  edit as it did before it.
+
+---
+
+## 2026-08-16 — A ref is what the next event needs to know
+
+A drag that clamps at the top of the axis ends with the pointer far above the point it just
+corrected. The release therefore lands on empty chart — and empty chart had just been given a
+meaning: a click there asks for the numbers. So finishing a correction switched the chart into
+reading mode, every time the value hit the top of its scale.
+
+The fix is one line of bookkeeping: the lane remembers that this gesture moved a point, and the
+click that follows checks it and clears it. What is worth remembering is why it is a `useRef` and
+not `useState`:
+
+- **It must not cause a render.** Nothing on screen depends on it.
+- **It must be readable in the very next event, synchronously.** A state update is not visible to
+  the handler that scheduled it; a ref is written and read immediately.
+
+**State is for what the screen shows. A ref is for what the next event needs to know.** That is the
+whole distinction, and this is a cleaner example of it than the hold timer, which needed a ref for
+the more obvious reason that a timer has to be cancellable.
+
+The larger point about this chart: one surface now answers four gestures — press a point to select,
+hold and drag to correct, press the readout to open the sheet, press nothing to switch how the
+chart reads. **Each one is defined by how it ends, not by how it begins**, which is why they can
+share a surface at all, and why every one of them needed an explicit rule about what the other three
+must not do.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

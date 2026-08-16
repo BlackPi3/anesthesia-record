@@ -458,6 +458,55 @@ is the entry button.
 
 ---
 
+## 2026-08-16 — The chart reads two ways: trend lines, or every value written out
+
+**What:** a tap on the chart anywhere that is not a point drops the trend lines and writes each
+measured value beside its own point. Tapping again brings the lines back. The same state has a
+button above the axis (*Zahlen anzeigen* / *Zahlen ausblenden*), and selecting a point still shows
+the readout and still opens the entry sheet, in either mode.
+
+**Why:** a position on an axis is not a number. The lanes were readable as shape — the saturation
+held, the pressure fell after minute 20 — and unreadable as record: the only way to learn that a
+reading was 98 and not 99 was to select that one point and read the box, one point at a time. Both
+readings are needed, and a protocol is read for the numbers at exactly the moments the trend has
+already done its job.
+
+**Why the lines go when the numbers come.** They are the one mark on the chart that carries no
+value of its own: they say how the record moved between two measurements, which is precisely what
+is not being asked for when someone asks what the measurements were. They also cross the labels,
+and 51 numbers read across a stroke of the same colour is worse than either view alone. The blood
+pressure lane keeps its vertical systolic–diastolic stroke, which is not a trend: it is the
+notation for one measurement, and it is what groups three numbers into one reading.
+
+**Why a tap on the chart, and a button as well.** The gesture is where the eye and the finger
+already are, and it is the one part of the chart that meant nothing until now. But nobody finds it
+unaided and a keyboard cannot perform it, so the button carries the same state, says which of the
+two modes is on, and is what makes the mode discoverable at all. On touch it is a `click`, not a
+pointer-down, for the reason the bands' hit areas are: a browser withholds the click when a touch
+turns into a scroll, so a swipe across the timeline scrolls the record and changes nothing.
+
+**The labels carry the value and nothing else** — no unit, no time. The unit is at the lane's edge
+and is the same for every point in it; the time is the position on the axis the label is already
+sitting at, and the five-minute grid it sits between. Printing either beside every point would
+roughly double the label width and halve how many fit, in order to repeat what the chart already
+says. The exact minute is a question about one entry, and the one entry's readout answers it.
+
+**Placement is a search, not an offset** (`src/timeline/labels.ts`). Always-above breaks on the two
+things this chart is made of: a blood pressure measurement is three values a few pixels apart on
+one timestamp, and a dense series puts neighbouring points closer together than their labels are
+wide. Each label takes the first of eight candidate positions that hides nothing and stays inside
+the lane, avoiding the labels already placed, the markers, and the readout box when a point is
+selected. Where the lane is too crowded for a clean arrangement, it takes the least bad position
+rather than being dropped: a value drawn over a gridline is still legible, and a value silently
+omitted is a hole in a clinical record. Placement runs left to right so a lane redrawn after a
+correction reads the way it did before.
+
+**Relation to the deferred merged view:** this is not it, and it does not replace it. This makes
+one lane readable as numbers; the merged view is about reading *across* lanes, and the cheap step
+noted there — a shared time cursor — is still the cheap step.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures

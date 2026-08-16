@@ -16,9 +16,16 @@
  * medication or a milestone is a drug, a dose, a unit and a time, none of which a drag can
  * express, so the bands hand their entries to the entry sheet instead. Creation for all of them
  * runs through the "+" flow.
+ *
+ * The chart also reads two ways. Its normal state is a trace: points joined into a line, which is
+ * what makes a trend visible and is the reason to draw vitals at all. But a protocol is also read
+ * for exact numbers, and a position on an axis cannot give one. So a tap on the chart itself —
+ * anywhere that is not a point — drops the lines and writes every value beside its point. The
+ * lines are the trend, the numbers are the record, and neither has to be guessed from the other.
  */
 
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { Button } from 'antd'
 
 import {
   GRID_INTERVAL_MS,
@@ -34,6 +41,7 @@ import type { LaneDef } from '../domain/catalog'
 import { formatTime, formatNumber, formatValue } from '../format'
 import { chart, laneColor } from '../theme'
 import { useElementWidth } from '../useElementWidth'
+import { placeValueLabels, type Box } from './labels'
 import {
   clamp,
   createLaneScales,
@@ -41,6 +49,7 @@ import {
   gridTimes,
   pointerToMeasurement,
   snapToStep,
+  type PlotArea,
   type TimeWindow,
 } from './scales'
 
@@ -79,6 +88,24 @@ const HOLD_SLOP = 10
 const KEY_TIME_STEP = 60_000
 /** Space kept clear at the right of the readout for the chevron that says it opens the sheet. */
 const CHEVRON_ROOM = 18
+const READOUT_HEIGHT = 22
+
+/**
+ * The value labels of the reading mode. A point larger than the marker it labels, deliberately:
+ * this text exists because the chart was not readable as numbers, so it is set at the size of the
+ * axis labels rather than smaller. Width is estimated from the character count — these are two to
+ * five tabular digits, never prose, so measuring the text in the DOM would buy nothing.
+ */
+const LABEL_FONT = 13
+const LABEL_HEIGHT = 18
+const LABEL_CHAR_WIDTH = 7.6
+const LABEL_PADDING = 6
+/** The marker's own footprint, which no other point's label may sit on. */
+const MARKER_BOX = 14
+
+function labelWidth(text: string): number {
+  return text.length * LABEL_CHAR_WIDTH + LABEL_PADDING * 2
+}
 
 // ---------------------------------------------------------------------------
 
@@ -93,13 +120,36 @@ export interface TimelineProps {
 export function Timeline({ record, onCorrect, onRemove, onEdit }: TimelineProps) {
   const [ref, width] = useElementWidth<HTMLDivElement>()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Held here rather than per lane: "show me the numbers" is a way of reading the record, not a
+  // property of one parameter. Reading a saturation against the heart rate at the same minute is
+  // the whole reason the lanes share a time axis, and it only works if they answer together.
+  const [showValues, setShowValues] = useState(false)
   const window = caseTimeWindow(record)
   const events = phaseEvents(record)
+  const hasVitals = LANES.some((lane) =>
+    lane.vitals.some((kind) => vitalSeries(record, kind).length > 0),
+  )
 
   return (
     <div ref={ref} className="timeline">
       {width > GUTTER + RIGHT_PAD + 80 && (
         <>
+          {/* The gesture is the fast way in and the button is the discoverable one. A tap on the
+              chart is worth having — it is where the eye and the finger already are — but nobody
+              finds it on their own, and it is unreachable from a keyboard. Both drive the one
+              state, so the button also says which of the two modes is currently on. */}
+          {hasVitals && (
+            <div className="timeline__head">
+              <Button
+                size="small"
+                className="timeline__values-toggle"
+                aria-pressed={showValues}
+                onClick={() => setShowValues((shown) => !shown)}
+              >
+                {showValues ? 'Zahlen ausblenden' : 'Zahlen anzeigen'}
+              </Button>
+            </div>
+          )}
           <TimeAxis width={width} window={window} />
           {LANES.map((lane) => (
             <VitalLane
@@ -110,7 +160,9 @@ export function Timeline({ record, onCorrect, onRemove, onEdit }: TimelineProps)
               record={record}
               events={events}
               selectedId={selectedId}
+              showValues={showValues}
               onSelect={setSelectedId}
+              onToggleValues={() => setShowValues((shown) => !shown)}
               onCorrect={onCorrect}
               onRemove={onRemove}
               onEdit={onEdit}
@@ -249,7 +301,9 @@ interface LaneProps {
   record: AnesthesiaCase
   events: PhaseEventEntry[]
   selectedId: string | null
+  showValues: boolean
   onSelect: (id: string | null) => void
+  onToggleValues: () => void
   onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
   onRemove: (id: string) => void
   onEdit: (id: string) => void
@@ -262,7 +316,9 @@ function VitalLane({
   record,
   events,
   selectedId,
+  showValues,
   onSelect,
+  onToggleValues,
   onCorrect,
   onRemove,
   onEdit,
@@ -270,6 +326,12 @@ function VitalLane({
   const [drag, setDrag] = useState<Drag | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * Whether the gesture that is ending moved a point. A drag that leaves the pointer clear of the
+   * point it just corrected — because the value clamped at the top of the axis, say — ends with a
+   * click over empty chart, and without this that click would read as "show the numbers".
+   */
+  const corrected = useRef(false)
   const grabbed = drag?.armed ?? false
 
   // A pending hold outliving the lane would arm a point that is no longer on screen.
@@ -324,9 +386,37 @@ function VitalLane({
       .sort((a, b) => a.at - b.at),
   }))
   const points = seriesByKind.flatMap((series) => series.points)
+  const pointsById = new Map(points.map((point) => [point.id, point]))
   const active = points.find((point) => point.id === (drag?.id ?? selectedId)) ?? null
 
-  function localPoint(event: React.PointerEvent<SVGSVGElement>) {
+  /**
+   * The numbers, placed against the points as they are currently drawn — so a point being dragged
+   * carries its label with it, and a corrected value is written in the moment it changes.
+   *
+   * The selected point is left out and its marker is not: its readout already spells the value
+   * out, with the unit and the time the label deliberately drops, and a label beside it would be
+   * the same number twice. The readout box joins the obstacles for the same reason the markers
+   * do — it is opaque, and a value printed under it is a value nobody can read.
+   */
+  const labels = showValues
+    ? placeValueLabels(
+        points
+          .filter((point) => point.id !== active?.id)
+          .map((point) => ({
+            id: point.id,
+            x: point.x,
+            y: point.y,
+            width: labelWidth(formatValue(point.kind, point.value)),
+            height: LABEL_HEIGHT,
+          })),
+        [...points.map(markerBox), ...(active ? [readoutBox(active, area)] : [])],
+        { x: area.left, y: 0, width: area.right - area.left, height },
+      )
+    : []
+
+  // Typed as the mouse event both a pointer event and a click satisfy, so the hit test and the
+  // toggle read a position the same way.
+  function localPoint(event: React.MouseEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect()
     return { x: event.clientX - rect.left, y: event.clientY - rect.top }
   }
@@ -372,6 +462,7 @@ function VitalLane({
     // below it sees nothing.
     if (event.target instanceof Element && event.target.closest('[data-readout]')) return
 
+    corrected.current = false
     const at = localPoint(event)
     const hit = hitTest(at)
 
@@ -433,7 +524,30 @@ function VitalLane({
     // Below the threshold this is still a tap, and the point must not twitch under a fingertip.
     if (!drag.moved && travelled <= DRAG_THRESHOLD) return
 
+    corrected.current = true
     setDrag({ ...drag, moved: true, ...pointerToMeasurement(at, scales, VITALS[drag.kind].step) })
+  }
+
+  /**
+   * A press on the chart that hit nothing asks for the numbers, or puts them away again.
+   *
+   * On `click` rather than on the pointer down that already handles selection, and for the reason
+   * the bands' hit areas are: a browser withholds the click when a touch turns into a scroll, so a
+   * swipe across the timeline scrolls the page and changes nothing about how the chart reads. That
+   * is the same distinction the lanes had to draw by hand for a grab, already drawn here.
+   */
+  function handleClick(event: React.MouseEvent<SVGSVGElement>) {
+    if (event.target instanceof Element && event.target.closest('[data-readout]')) return
+    if (corrected.current) {
+      corrected.current = false
+      return
+    }
+    // A press on or near a point selected it; that is what the press meant, and this lane keeps
+    // the numbers it is showing. Labels sit inside the hit radius of their own point, which makes
+    // the number a second, larger target for selecting the point it belongs to.
+    if (hitTest(localPoint(event))) return
+
+    onToggleValues()
   }
 
   function handlePointerUp(event: React.PointerEvent<SVGSVGElement>) {
@@ -512,6 +626,7 @@ function VitalLane({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
+      onClick={handleClick}
       onKeyDown={handleKeyDown}
     >
       {/* Value gridlines, recessive: they orient, they are not data. */}
@@ -581,7 +696,11 @@ function VitalLane({
 
       {seriesByKind.map(({ kind, points: series }) => (
         <g key={kind}>
-          {series.length > 1 && (
+          {/* The trend line goes while the numbers are up. It is the thing the labels have to be
+              read across, and it is the one piece of ink on the chart that carries no value of its
+              own: it says how the record moved between two measurements, which is exactly what is
+              not being asked for when someone asks what the measurements were. */}
+          {series.length > 1 && !showValues && (
             <polyline
               points={series.map((point) => `${point.x},${point.y}`).join(' ')}
               fill="none"
@@ -603,6 +722,28 @@ function VitalLane({
           ))}
         </g>
       ))}
+
+      {/* Hidden from assistive technology on purpose: the marks these annotate are already in the
+          lane's own description, and a bare run of numbers with no metric and no time attached is
+          not a better reading of the chart than that. The spoken route to an exact value is the
+          one it has always been — select the point, hear the readout. */}
+      {labels.length > 0 && (
+        <g aria-hidden="true" pointerEvents="none">
+          {labels.map((label) => {
+            const point = pointsById.get(label.id)
+            if (!point) return null
+            return (
+              <ValueLabel
+                key={label.id}
+                entryId={label.id}
+                box={label}
+                text={formatValue(point.kind, point.value)}
+                color={color}
+              />
+            )
+          })}
+        </g>
+      )}
 
       {active && <SelectionRing point={active} color={color} grabbed={grabbed} />}
       {active && <Readout point={active} area={area} grabbed={grabbed} onEdit={onEdit} />}
@@ -653,6 +794,71 @@ function Marker({
   return <circle cx={x} cy={y} r={4.5} {...shared} />
 }
 
+/** What a marker covers, so no other point's label is written over it. */
+function markerBox(point: LanePoint): Box {
+  return {
+    x: point.x - MARKER_BOX / 2,
+    y: point.y - MARKER_BOX / 2,
+    width: MARKER_BOX,
+    height: MARKER_BOX,
+  }
+}
+
+/**
+ * One measured value, written next to its point.
+ *
+ * The number and nothing else. The unit is at the lane's edge, where it is the same for every
+ * point in the lane, and the time is the position on the axis the label is already sitting at —
+ * printing either beside every point would double the width of the labels and halve how many of
+ * them fit, to repeat what the chart says twice over. The exact minute is a question about one
+ * entry, and it is answered by the readout of the point that raised it.
+ *
+ * It carries its own surface, because a number set straight onto the chart is read across
+ * gridlines, event rules and the neighbouring lane's ink. The hairline is the lane's colour, which
+ * is what ties a label back to its series where two lanes' labels come close.
+ */
+function ValueLabel({
+  box,
+  text,
+  color,
+  entryId,
+}: {
+  box: Box
+  text: string
+  color: string
+  entryId: string
+}) {
+  // `data-value-label` rather than `data-entry-id`, for the reason the readout carries its own
+  // hook: the marker for this entry already answers to that one, and a second element under the
+  // same name would make every lookup by entry id ambiguous while the numbers are up.
+  return (
+    <g data-value-label={entryId}>
+      <rect
+        x={box.x}
+        y={box.y}
+        width={box.width}
+        height={box.height}
+        rx={4}
+        fill={chart.surface}
+        opacity={0.94}
+        stroke={color}
+        strokeOpacity={0.4}
+      />
+      <text
+        x={box.x + box.width / 2}
+        y={box.y + box.height / 2 + 4.5}
+        fill={chart.ink}
+        fontSize={LABEL_FONT}
+        fontWeight={600}
+        textAnchor="middle"
+        style={{ fontVariantNumeric: 'tabular-nums' }}
+      >
+        {text}
+      </text>
+    </g>
+  )
+}
+
 /**
  * The ring grows the moment the point is actually held. On touch that growth is the whole
  * acknowledgment of the hold: it is how the user learns the point is now theirs to move, and that
@@ -695,6 +901,34 @@ function SelectionRing({
  * thing to find. The chevron is there to say it opens something; a box that only prints a number
  * gives no reason to press it.
  */
+function readoutLabel(point: LanePoint): string {
+  const meta = VITALS[point.kind]
+  return `${meta.short} ${formatValue(point.kind, point.value)} ${meta.unit} · ${formatTime(point.at)}`
+}
+
+/**
+ * Where the readout sits, as a plain rectangle.
+ *
+ * Anchored to the top edge of the lane rather than trailing the point. A lane is only about 90
+ * pixels tall, so a box that follows the point vertically spends most of its time covering the
+ * trace being corrected; pinning it means the eye always knows where the number is. It drops to
+ * the bottom edge only when the point itself is up there.
+ *
+ * Separate from the drawing because the label placement has to know about this box too: it is
+ * opaque, it is wide, and it lands exactly where a value label would otherwise go.
+ */
+function readoutBox(point: LanePoint, area: PlotArea): Box {
+  const width = readoutLabel(point).length * 6.6 + 16 + CHEVRON_ROOM
+  const nearTop = point.y - area.top < 40
+
+  return {
+    x: clamp(point.x - width / 2, area.left, Math.max(area.right - width, area.left)),
+    y: nearTop ? area.bottom - 24 : area.top + 2,
+    width,
+    height: READOUT_HEIGHT,
+  }
+}
+
 function Readout({
   point,
   area,
@@ -702,21 +936,12 @@ function Readout({
   onEdit,
 }: {
   point: LanePoint
-  area: { left: number; right: number; top: number; bottom: number }
+  area: PlotArea
   grabbed: boolean
   onEdit: (id: string) => void
 }) {
-  const meta = VITALS[point.kind]
-  const label = `${meta.short} ${formatValue(point.kind, point.value)} ${meta.unit} · ${formatTime(point.at)}`
-  const boxWidth = label.length * 6.6 + 16 + CHEVRON_ROOM
-
-  // Anchored to the top edge of the lane rather than trailing the point. A lane is only about 90
-  // pixels tall, so a box that follows the point vertically spends most of its time covering the
-  // trace being corrected; pinning it means the eye always knows where the number is. It drops to
-  // the bottom edge only when the point itself is up there.
-  const nearTop = point.y - area.top < 40
-  const x = clamp(point.x - boxWidth / 2, area.left, Math.max(area.right - boxWidth, area.left))
-  const y = nearTop ? area.bottom - 24 : area.top + 2
+  const label = readoutLabel(point)
+  const { x, y, width: boxWidth } = readoutBox(point, area)
   const chevronX = x + boxWidth - CHEVRON_ROOM + 2
   const middle = y + 11
 

@@ -31,6 +31,9 @@ Everything the record holds can be written, corrected and removed, and the case 
 - **Vitals** are drawn as one lane per parameter over a shared time axis. A point is corrected by
   dragging it, by arrow keys once selected, or by opening it in the entry sheet from its readout.
   On a touchscreen a swipe scrolls the record and a press and hold is what moves a value.
+- **Reading the numbers**: a tap on the chart clear of any point drops the trend lines and writes
+  every value beside its point; tapping again brings the lines back. The button above the axis does
+  the same and says which of the two modes is on.
 - **Medications, fluids and phase events** are corrected by tapping them in their band, which
   reopens the sheet they were written in. Ending a running infusion is the same sheet.
 - **The audit trail** is kept on every entry and shown in the sheet, in front of whoever is about
@@ -41,8 +44,8 @@ Everything the record holds can be written, corrected and removed, and the case 
 The domain layer holds the case and entry types, the vital/event catalogue with its German labels
 and ranges, the local-storage persistence layer, and a fictional demo case.
 
-53 unit tests cover the domain layer and the timeline's coordinate maths. 127 Playwright tests run
-across desktop Chrome, an iPad-sized viewport with touch, and WebKit.
+65 unit tests cover the domain layer and the timeline's coordinate and label-placement maths. 144
+Playwright tests run across desktop Chrome, an iPad-sized viewport with touch, and WebKit.
 
 This README grows alongside the build; sections appear as the thing they describe does.
 
@@ -129,6 +132,16 @@ as configuration in `src/domain/catalog.ts`, so regrouping them is an edit to th
 
 Phase events are drawn as dashed rules through every lane, so the vitals at incision can be read
 without leaving the entry layout.
+
+The chart reads two ways. Its normal state is a trace, which is what makes a trend visible; a tap
+on the chart itself drops the lines and writes every measured value beside its point, because a
+position on an axis is not a number. The labels carry the value alone — the unit is at the lane's
+edge and the time is the position they already sit at — and where each one goes is a search, not a
+fixed offset: three blood pressures share one timestamp a few pixels apart, and neighbouring points
+in a dense series sit closer together than their labels are wide. [`labels.ts`](src/timeline/labels.ts)
+gives each label the first of eight candidate positions that hides nothing and stays inside the
+lane, avoiding the markers, the labels already placed, and the readout of a selected point. It is
+pure geometry, tested with numbers like the scales are.
 
 Colours are the four categorical slots in fixed order, one per lane, validated for colour-vision
 separation against the surface. Two of them fall below 3:1 contrast, so identity never rests on

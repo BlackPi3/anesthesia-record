@@ -121,6 +121,32 @@ test('holding a point first grabs it, and the page stays put while it is moved',
   expect(await scrollY(page)).toBe(0)
 })
 
+test('swiping over empty chart scrolls, and does not switch how the chart reads', async ({
+  page,
+}) => {
+  const lane = page.getByRole('group', { name: /Sauerstoffsättigung, Achse/ })
+  const box = (await lane.boundingBox())!
+  // Clear of every point: the saturation axis runs down to 70 % and this case never goes near it.
+  const from = { x: box.x + box.width - 60, y: box.y + box.height - 8 }
+
+  await swipe(page, from, { x: from.x, y: from.y - 200 })
+
+  await expect.poll(() => scrollY(page), { message: 'the page should have scrolled' }).toBeGreaterThan(0)
+  // The numbers are asked for by a tap. A swipe is how the record is read on an iPad, and it must
+  // pass over the chart without changing it — the same rule the grab follows.
+  await expect(page.locator('[data-value-label]')).toHaveCount(0)
+})
+
+test('a tap on empty chart writes the values out', async ({ page }) => {
+  const lane = page.getByRole('group', { name: /Sauerstoffsättigung, Achse/ })
+  const box = (await lane.boundingBox())!
+
+  await page.touchscreen.tap(box.x + box.width - 60, box.y + box.height - 8)
+
+  await expect(page.locator('[data-value-label]').first()).toBeVisible()
+  await expect(page.locator('[data-value-label="demo-heartRate-20"]')).toHaveText('79')
+})
+
 test('a tap reads a value without moving it', async ({ page }) => {
   const at = await centreOf(page, 'demo-heartRate-30')
   await page.touchscreen.tap(at.x, at.y)

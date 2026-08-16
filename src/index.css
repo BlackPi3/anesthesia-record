@@ -364,6 +364,24 @@ body {
 }
 
 /*
+ * The row above the time axis, holding the reading-mode toggle. Right-aligned and quiet: it is a
+ * way of looking at the record, not something that changes it, and it must not compete with the
+ * entry button. Sized back up to a real touch target — AntD's small button is a mouse size, and
+ * this one is pressed on an iPad.
+ */
+.timeline__head {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.timeline__values-toggle.ant-btn {
+  height: 36px;
+  padding-inline: 14px;
+  font-size: 14px;
+}
+
+/*
  * The empty record, written across the middle of the lanes. It sits over the grid rather than
  * replacing it, and lets every pointer through: there is nothing here to press, and the control it
  * names is the entry button.
