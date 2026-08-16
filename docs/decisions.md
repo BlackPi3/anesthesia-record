@@ -290,6 +290,39 @@ the user did not choose, which is the one thing a record must never do).
 
 ---
 
+## 2026-08-16 — A touch has to be held before it can move a value
+
+**What:** On the timeline, a mouse or a stylus grabs the point it lands on immediately, as before.
+A touch has to rest on the point for 250 ms first. Until that hold completes the gesture belongs to
+the browser and the page scrolls normally; moving before it completes releases the point entirely.
+The lane carries `touch-action: pan-y` by default and `none` only while a grab is live.
+
+**Why:** The gesture that corrects a value and the gesture that scrolls the record are the same
+gesture on an iPad, and the timeline fills most of the screen. With `touch-action: none` on the
+lane, every touch was handed to the app: a swipe that started within 22 px of any point dragged it
+instead of scrolling, and the page did not move at all. Verified on the emulated iPad by scripting
+the swipe — a heart rate went from 81 to 180, silently. A correction is reversible through the
+audit trail, but an unnoticed one is not, and nothing about a swipe suggests a value was rewritten.
+
+Branching on `PointerEvent.pointerType` is what lets both devices be right at once. The brief asks
+for precise mouse interaction by name, and a hold would make the desktop and the Apple Pencil worse
+for no gain, so only `touch` pays for it. The hold is acknowledged visibly — the selection ring
+grows and thickens the moment the point is actually held — because a delay with no feedback reads
+as the app failing to respond.
+
+**Rejected:** Raising the drag threshold (a swipe travels far past any threshold that still lets a
+deliberate drag start, so this trades one failure for another). Dragging only from a direct hit on
+the marker rather than the hit radius (loses the 44 px touch target the brief asks for, and the
+reported swipe started on the marker anyway).
+
+**Note:** `touch-action` is settled by the browser when a touch begins, so flipping it to `none`
+mid-gesture cannot reclaim a scroll already in flight. The lane therefore also attaches a
+non-passive `touchmove` listener while grabbed and calls `preventDefault`. React registers its own
+touch listeners passively, where `preventDefault` does nothing, which is why this one listener is
+attached by hand instead of as a JSX prop.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures

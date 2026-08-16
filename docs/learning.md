@@ -126,6 +126,38 @@ claims, and the gap between them is where a lot of time goes. Second, the fix be
 rather than the app: a close animation is normal, and removing it to make a test pass would be
 letting the test design the product.
 
+## 2026-08-16 — The defect was in a CSS property, and the fix was not
+
+`.timeline svg { touch-action: none }` was one line, added for a real reason: without it the
+browser claims a drag as a scroll and correction never works on touch. It was applied to the whole
+lane rather than to the act of dragging, which meant the browser handed *every* touch to the app.
+On an iPad, where a swipe over the timeline is how the page is scrolled, that turned an ordinary
+scroll into a silent correction.
+
+Three things worth keeping from it.
+
+**A property that is right during a gesture can be wrong before one starts.** The mistake was not
+the value, it was the duration: `none` was correct while dragging and wrong the rest of the time.
+Asking "when should this be true?" rather than "should this be true?" would have caught it.
+
+**`touch-action` is not live.** The obvious fix is to default to `pan-y` and switch to `none` once
+the point is grabbed. It does not work: the browser settles `touch-action` when the touch begins,
+so changing it mid-gesture has no effect on the gesture in flight. The thing that does reclaim a
+gesture is `preventDefault()` on `touchmove`. The CSS change is still right, it is just not
+sufficient on its own, and expecting it to be would have produced a fix that looked correct and
+failed on the device.
+
+**React attaches touch listeners passively.** `onTouchMove` as a JSX prop cannot cancel a scroll:
+React registers `touchmove` at the root as a passive listener, where `preventDefault()` is ignored
+outright. The listener has to be added with `addEventListener(..., { passive: false })` on the
+element itself. This is the first place in this build where a JSX event prop was not enough, and
+the reason is a browser performance default, not a React one.
+
+Also worth noting: `event.currentTarget` is null by the time a `setTimeout` callback runs, because
+React clears it after dispatch. The hold path reads the element through a ref instead.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

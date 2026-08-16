@@ -282,16 +282,25 @@ body {
   margin-left: auto;
 }
 
-/* Touch input must not be interpreted as text selection or a scroll while dragging a point. */
+/*
+ * A touch over a lane belongs to the page by default. The timeline fills most of an iPad screen,
+ * so swiping across it is how the record is scrolled; `pan-y` leaves that gesture with the
+ * browser. Only a point that has been deliberately grabbed takes the touch, and only while the
+ * grab lasts.
+ */
 .timeline svg {
   display: block;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .timeline__lane {
   border-radius: 4px;
+}
+
+.timeline__lane--grabbed {
+  touch-action: none;
 }
 
 /* Lanes are keyboard-reachable, so the focus ring has to be real and visible. */

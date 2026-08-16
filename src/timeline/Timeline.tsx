@@ -15,7 +15,7 @@
  * is separate and still to come.
  */
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 
 import {
   GRID_INTERVAL_MS,
@@ -61,6 +61,15 @@ const EVENT_ROW_HEIGHT = 34
 const HIT_RADIUS = 22
 /** Movement past this counts as a drag rather than a tap. */
 const DRAG_THRESHOLD = 4
+/**
+ * How long a finger must rest on a point before it can be moved. Touch only: a swipe is how an
+ * iPad is scrolled, so a touch that lands on a point cannot be taken as a correction on contact.
+ * Long enough that a swipe passing over a point never grabs it, short enough that a deliberate
+ * grab does not feel like waiting.
+ */
+const HOLD_MS = 250
+/** Movement past this during the hold means the gesture was a swipe, and the point is let go. */
+const HOLD_SLOP = 10
 /** One arrow-key press along the time axis. */
 const KEY_TIME_STEP = 60_000
 
@@ -185,6 +194,11 @@ interface Drag {
   startX: number
   startY: number
   moved: boolean
+  /**
+   * Whether the point is actually being held. A mouse or a stylus arms on contact; a touch only
+   * once the hold completes, and until then the gesture still belongs to the browser.
+   */
+  armed: boolean
   at: Timestamp
   value: number
 }
@@ -213,6 +227,32 @@ function VitalLane({
   onRemove,
 }: LaneProps) {
   const [drag, setDrag] = useState<Drag | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const grabbed = drag?.armed ?? false
+
+  // A pending hold outliving the lane would arm a point that is no longer on screen.
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current !== null) clearTimeout(holdTimer.current)
+    }
+  }, [])
+
+  /**
+   * While a grab is live the page must not scroll underneath it. `touch-action` is settled by the
+   * browser when the touch begins, so changing it cannot reclaim a gesture already in flight;
+   * preventing the `touchmove` can. React attaches its own touch listeners passively, where
+   * `preventDefault` is ignored, so this one is attached directly and only for as long as it is
+   * needed.
+   */
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg || !grabbed) return
+
+    const keepGesture = (event: TouchEvent) => event.preventDefault()
+    svg.addEventListener('touchmove', keepGesture, { passive: false })
+    return () => svg.removeEventListener('touchmove', keepGesture)
+  }, [grabbed])
 
   const height = Math.round(LANE_BASE_HEIGHT * lane.weight)
   const area = {
@@ -265,6 +305,25 @@ function VitalLane({
     return best
   }
 
+  function cancelHold() {
+    if (holdTimer.current === null) return
+    clearTimeout(holdTimer.current)
+    holdTimer.current = null
+  }
+
+  /**
+   * Take the pointer. Capture routes every later event for it here, so a drag that wanders out of
+   * the lane keeps tracking instead of freezing the point mid-correction. Read through the ref
+   * rather than the event, because the touch path calls this from a timer, by which time React has
+   * already cleared the event's `currentTarget`.
+   */
+  function grab(pointerId: number) {
+    const svg = svgRef.current
+    if (!svg) return
+    svg.setPointerCapture(pointerId)
+    svg.focus()
+  }
+
   function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
     const at = localPoint(event)
     const hit = hitTest(at)
@@ -274,11 +333,26 @@ function VitalLane({
       return
     }
 
-    // Capture routes every later event for this pointer here, so a drag that wanders out of the
-    // lane keeps tracking instead of freezing the point mid-correction.
-    event.currentTarget.setPointerCapture(event.pointerId)
-    event.currentTarget.focus()
+    // Selecting on contact is what makes a tap a way to read a value. Moving it is a separate
+    // question, answered below.
     onSelect(hit.id)
+
+    // A mouse and a stylus are precise enough to mean the point they land on, so they arm at
+    // once, exactly as before. A touch is not: the same gesture that grabs a point is the one
+    // that scrolls the page, so it has to be held first. Until then nothing is captured and the
+    // browser keeps the gesture.
+    const armed = event.pointerType !== 'touch'
+    if (armed) {
+      grab(event.pointerId)
+    } else {
+      const { pointerId } = event
+      holdTimer.current = setTimeout(() => {
+        holdTimer.current = null
+        grab(pointerId)
+        setDrag((current) => (current ? { ...current, armed: true } : null))
+      }, HOLD_MS)
+    }
+
     setDrag({
       pointerId: event.pointerId,
       id: hit.id,
@@ -286,6 +360,7 @@ function VitalLane({
       startX: at.x,
       startY: at.y,
       moved: false,
+      armed,
       at: hit.at,
       value: hit.value,
     })
@@ -295,8 +370,21 @@ function VitalLane({
     if (!drag || drag.pointerId !== event.pointerId) return
 
     const at = localPoint(event)
+    const travelled = Math.hypot(at.x - drag.startX, at.y - drag.startY)
+
+    // Movement before the hold completes means this was a swipe rather than a grab. Let the point
+    // go entirely: it keeps its value, and the browser scrolls the page as it would anywhere else.
+    if (!drag.armed) {
+      if (travelled > HOLD_SLOP) {
+        cancelHold()
+        setDrag(null)
+        onSelect(null)
+      }
+      return
+    }
+
     // Below the threshold this is still a tap, and the point must not twitch under a fingertip.
-    if (!drag.moved && Math.hypot(at.x - drag.startX, at.y - drag.startY) <= DRAG_THRESHOLD) return
+    if (!drag.moved && travelled <= DRAG_THRESHOLD) return
 
     setDrag({ ...drag, moved: true, ...pointerToMeasurement(at, scales, VITALS[drag.kind].step) })
   }
@@ -304,14 +392,22 @@ function VitalLane({
   function handlePointerUp(event: React.PointerEvent<SVGSVGElement>) {
     if (!drag || drag.pointerId !== event.pointerId) return
 
-    event.currentTarget.releasePointerCapture(event.pointerId)
-    if (drag.moved) onCorrect(drag.id, { at: drag.at, value: drag.value })
+    cancelHold()
+    // A touch that was released before its hold completed never captured anything.
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    if (drag.armed && drag.moved) onCorrect(drag.id, { at: drag.at, value: drag.value })
     setDrag(null)
   }
 
-  /** A cancelled pointer (a system gesture taking over) discards the correction. */
+  /**
+   * A cancelled pointer discards the correction. On touch this is the ordinary ending, not an
+   * exceptional one: it is what the browser sends when it claims the gesture for a scroll.
+   */
   function handlePointerCancel(event: React.PointerEvent<SVGSVGElement>) {
     if (!drag || drag.pointerId !== event.pointerId) return
+    cancelHold()
     setDrag(null)
   }
 
@@ -352,9 +448,10 @@ function VitalLane({
 
   return (
     <svg
+      ref={svgRef}
       width={width}
       height={height}
-      className="timeline__lane"
+      className={grabbed ? 'timeline__lane timeline__lane--grabbed' : 'timeline__lane'}
       role="group"
       tabIndex={0}
       aria-label={`${lane.label}, Achse von ${min} bis ${max} ${laneUnit(lane)}. Punkt auswählen und mit den Pfeiltasten korrigieren.`}
@@ -454,8 +551,8 @@ function VitalLane({
         </g>
       ))}
 
-      {active && <SelectionRing point={active} color={color} dragging={drag?.moved ?? false} />}
-      {active && <Readout point={active} area={area} dragging={drag?.moved ?? false} />}
+      {active && <SelectionRing point={active} color={color} grabbed={grabbed} />}
+      {active && <Readout point={active} area={area} grabbed={grabbed} />}
 
       <line
         x1={area.left}
@@ -503,24 +600,29 @@ function Marker({
   return <circle cx={x} cy={y} r={4.5} {...shared} />
 }
 
+/**
+ * The ring grows the moment the point is actually held. On touch that growth is the whole
+ * acknowledgment of the hold: it is how the user learns the point is now theirs to move, and that
+ * the gesture is no longer going to scroll the page.
+ */
 function SelectionRing({
   point,
   color,
-  dragging,
+  grabbed,
 }: {
   point: LanePoint
   color: string
-  dragging: boolean
+  grabbed: boolean
 }) {
   return (
     <circle
       cx={point.x}
       cy={point.y}
-      r={dragging ? 14 : 11}
+      r={grabbed ? 14 : 11}
       fill="none"
       stroke={color}
-      strokeWidth={2}
-      opacity={dragging ? 0.9 : 0.6}
+      strokeWidth={grabbed ? 3 : 2}
+      opacity={grabbed ? 0.9 : 0.6}
       pointerEvents="none"
     />
   )
@@ -536,11 +638,11 @@ function SelectionRing({
 function Readout({
   point,
   area,
-  dragging,
+  grabbed,
 }: {
   point: LanePoint
   area: { left: number; right: number; top: number; bottom: number }
-  dragging: boolean
+  grabbed: boolean
 }) {
   const meta = VITALS[point.kind]
   const label = `${meta.short} ${formatValue(point.kind, point.value)} ${meta.unit} · ${formatTime(point.at)}`
@@ -563,7 +665,7 @@ function Readout({
         height={22}
         rx={4}
         fill={chart.ink}
-        opacity={dragging ? 0.92 : 0.78}
+        opacity={grabbed ? 0.92 : 0.78}
       />
       <text
         x={x + boxWidth / 2}
