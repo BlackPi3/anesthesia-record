@@ -238,6 +238,24 @@ writing plainly outside is both shorter and correct.
 
 ---
 
+## 2026-08-16 — The suite ran green on WebKit the first time, and that is information
+
+Adding a WebKit project was expected to find something. Thirty-nine tests passed on the first run,
+including the entry sheet, the undo shortcut and the pointer path.
+
+That is worth reading correctly rather than as luck. Nothing in the app is written against a
+browser: the chart is SVG with coordinates computed in the app's own code, persistence is
+`localStorage`, and every gesture goes through pointer events, which is the one input API all three
+of mouse, stylus and touch share. **Code that targets the platform instead of a browser tends to
+port for free**; the places that would not have are the places where a browser was assumed.
+
+What this does **not** cover: the hold-to-grab path. Those tests drive real touch gestures through
+the Chrome DevTools Protocol and are Chromium-only, so they are excluded from the WebKit project.
+Synthetic touch events do not cause real scrolling, so no cross-browser test can tell a page that
+scrolled from one that did not. That gap is honest and stays named in the README.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

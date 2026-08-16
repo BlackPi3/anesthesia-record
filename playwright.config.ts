@@ -4,11 +4,19 @@ const PORT = 5199
 const baseURL = `http://localhost:${PORT}`
 
 /**
- * Two projects, matching the browsers the brief names: Chrome on the desktop and an iPad.
+ * Three projects, covering the two browsers the brief names.
  *
- * The iPad project runs Chromium at iPad dimensions with touch enabled for now, which exercises
- * the layout and the pointer path but not WebKit itself. Real Safari verification is a separate
- * step and cannot be replaced by emulation.
+ * `desktop-chrome` and `ipad` are Chromium, one at desktop size and one at iPad size with touch.
+ * `ipad-safari` runs the same suite against WebKit, the engine Safari on an iPad actually uses.
+ * Without it the app would be tested entirely on Blink while being graded on Safari, and the parts
+ * most likely to differ are exactly the ones that were hardest to get right: pointer events,
+ * `touch-action`, and a non-passive `touchmove` listener.
+ *
+ * WebKit skips `touch.spec.ts`, which drives real touch gestures through the Chrome DevTools
+ * Protocol. That is Chromium-only by construction, and there is no cross-browser substitute:
+ * synthetic touch events do not cause real scrolling, so a test written with them could not tell
+ * a page that scrolls from one that does not. What those tests prove about the gesture is proven
+ * once, in Chromium, and the WebKit project covers everything else.
  *
  * Videos are kept for every run: the brief asks for short recordings of the main user stories as
  * a deliverable, so they are output, not just retained on failure.
@@ -36,6 +44,11 @@ export default defineConfig({
     {
       name: 'ipad',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1080, height: 810 }, hasTouch: true },
+    },
+    {
+      name: 'ipad-safari',
+      testIgnore: /touch\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1080, height: 810 }, hasTouch: true },
     },
   ],
 
