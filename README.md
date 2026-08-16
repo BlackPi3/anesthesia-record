@@ -167,11 +167,32 @@ npm run build     # typecheck and production build
 npm run lint
 npm test          # Vitest unit tests
 npm run e2e       # Playwright, starts the dev server itself
+npm run videos    # re-records the user-story videos in docs/videos/
 ```
 
-Playwright runs two projects, desktop Chrome and an iPad-sized viewport with touch, and records
-video of every run. Verification in real Safari on a physical iPad is a separate step that
-emulation does not replace.
+Playwright runs three projects: desktop Chrome, an iPad-sized viewport with touch, and the same
+iPad viewport under WebKit, the engine Safari uses. Video is recorded for every run.
+
+The touch tests (`tests/touch.spec.ts`) drive real gestures through the Chrome DevTools Protocol
+and run on Chromium only. Synthetic touch events do not cause real scrolling, so no cross-browser
+test can distinguish a page that scrolled from one that did not.
+
+Verification in Safari on physical iPad hardware is a separate step that emulation does not
+replace.
+
+## Recorded user stories
+
+`docs/videos/` holds a recording of each main user story, one file per project, produced by
+`tests/stories.spec.ts`. They are written to be watched: whole tasks at a pace a person can
+follow. They assert as they go, so a recording of a flow that stopped working fails instead of
+being filmed.
+
+| Story | Shows |
+|---|---|
+| `record-and-correct-a-value` | Recording an SpO₂ through the entry sheet, correcting it by dragging the point, and the audit trail behind it |
+| `record-a-bolus` | A single dose with its drug, amount and unit, appearing in the medication band |
+| `run-an-infusion-stop-it-and-undo` | A continuous infusion documented while it runs, ended from the band, and the ending taken back |
+| `scroll-safely-then-move-a-point` | On a touchscreen: a swipe over the timeline scrolls the record, and a press and hold is what moves a value |
 
 ## Agent usage
 

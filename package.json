@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "videos": "playwright test tests/stories.spec.ts"
   },
   "dependencies": {
     "antd": "^6.5.4",
