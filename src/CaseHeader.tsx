@@ -11,7 +11,7 @@
  * the layout should let it be mistaken for a real record.
  */
 
-import { Tag, Typography } from 'antd'
+import { Button, Tag, Typography } from 'antd'
 
 import type { AnesthesiaCase } from './domain/types'
 import { ageAt, formatDate, formatNumber, formatTime } from './format'
@@ -48,7 +48,14 @@ function SaveStatus({ save }: { save: SaveState }) {
   )
 }
 
-export function CaseHeader({ record, save }: { record: AnesthesiaCase; save: SaveState }) {
+export interface CaseHeaderProps {
+  record: AnesthesiaCase
+  save: SaveState
+  canUndo: boolean
+  onUndo: () => void
+}
+
+export function CaseHeader({ record, save, canUndo, onUndo }: CaseHeaderProps) {
   const { patient, baseline } = record
 
   const facts: Array<[label: string, value: string]> = [
@@ -78,7 +85,20 @@ export function CaseHeader({ record, save }: { record: AnesthesiaCase; save: Sav
         </Typography.Title>
         <Typography.Text type="secondary">{record.procedure}</Typography.Text>
         <Tag bordered>Demodaten</Tag>
-        <span className="case-header__save">
+        {/* Undo sits beside the save confirmation, because the two answer the same question from
+            opposite sides: what was just written down, and how to take it back. Always present and
+            disabled when there is nothing to undo, rather than appearing and disappearing — a
+            control that comes and goes is one nobody learns is there. */}
+        <span className="case-header__actions">
+          <Button
+            size="large"
+            disabled={!canUndo}
+            onClick={onUndo}
+            aria-label="Letzte Änderung rückgängig machen"
+            aria-keyshortcuts="Control+Z Meta+Z"
+          >
+            Rückgängig
+          </Button>
           <SaveStatus save={save} />
         </span>
       </div>

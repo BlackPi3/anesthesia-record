@@ -370,8 +370,11 @@ body {
   margin-top: 12px;
 }
 
-.case-header__save {
+.case-header__actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /*

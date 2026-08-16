@@ -213,6 +213,31 @@ bubbling, because adjusting the point while focus sits on its readout is the use
 
 ---
 
+## 2026-08-16 — Immutable state makes undo nearly free
+
+Parham's observation, and it was right against the agent's first answer, which called a real undo
+"a history stack, more work" and recommended a disappearing toast instead.
+
+The reasoning: `correctVital`, `addBolus` and the rest never modify the case they are given. They
+build a new one and return it, and `useCase` swaps the whole thing. So at the moment of any change
+there are two complete cases in memory, and the older one is not a copy or a reconstruction — it is
+the exact object the app was rendering a moment ago. Undo is a list of those and a pop.
+
+**The general lesson: what state is allowed to do decides what features are cheap.** Had the
+mutations edited entries in place, undo would have meant an inverse operation for every mutation,
+each able to drift out of step with the forward one. Nothing about the undo feature was planned for
+when that rule was set on 07.08; it fell out of it.
+
+Worth noticing where the cost went instead: memory, and a decision about what the audit trail should
+say. Neither is nothing, but both are smaller than the code that was avoided.
+
+**A trap avoided on the way**, and the same one already recorded above: the first draft of `undo`
+read the previous case inside a `setPast` updater and wrote to storage from in there. Updaters must
+be pure, and React runs them twice in development to say so. Reading the value from the closure and
+writing plainly outside is both shorter and correct.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

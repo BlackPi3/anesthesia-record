@@ -11,7 +11,7 @@
  * after the first entry.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Typography } from 'antd'
 
 import { CaseHeader } from './CaseHeader'
@@ -68,15 +68,18 @@ export default function App() {
  * its state non-optional.
  */
 function OpenCase({ initial }: { initial: AnesthesiaCase }) {
-  const { record, save, update } = useCase(initial)
+  const { record, save, update, undo, canUndo } = useCase(initial)
   // The entry being edited is held by id rather than as an object. A correction produces a new
   // case, so a stored entry would be the version from before the edit within one keystroke.
   const [editingId, setEditingId] = useState<string | null>(null)
+  // An entry undone out of the record stops being found here, which closes the sheet on its own.
   const editing = record.entries.find((entry) => entry.id === editingId) ?? null
+
+  useKeyboardUndo(undo)
 
   return (
     <div className="app">
-      <CaseHeader record={record} save={save} />
+      <CaseHeader record={record} save={save} canUndo={canUndo} onUndo={undo} />
       <main className="app__main">
         <Timeline
           record={record}
@@ -103,4 +106,33 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
       )}
     </div>
   )
+}
+
+/**
+ * Ctrl+Z, and Cmd+Z on a Mac.
+ *
+ * On `window` rather than on a container, because undo has to work wherever the last action left
+ * the focus — on a lane, in the sheet, or nowhere in particular after a tap on the chart. This is
+ * one of the few things in the app that is genuinely global, which is what earns the listener.
+ *
+ * An effect is the right tool precisely because it is not React's own event system: the handler
+ * subscribes to something outside React and has to unsubscribe when the component goes, which is
+ * what the returned function does.
+ */
+function useKeyboardUndo(undo: () => void) {
+  useEffect(() => {
+    function handle(event: KeyboardEvent) {
+      if (event.key !== 'z' && event.key !== 'Z') return
+      if (!event.ctrlKey && !event.metaKey) return
+      // Redo is a different feature and is not built; letting Shift+Z through would undo instead
+      // of redoing, which is worse than doing nothing.
+      if (event.shiftKey) return
+
+      event.preventDefault()
+      undo()
+    }
+
+    window.addEventListener('keydown', handle)
+    return () => window.removeEventListener('keydown', handle)
+  }, [undo])
 }

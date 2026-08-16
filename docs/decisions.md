@@ -406,6 +406,34 @@ was missing was a caller.
 
 ---
 
+## 2026-08-16 — Undo is a list of previous cases, not an inverse of every mutation
+
+**What:** `useCase` keeps the last 25 cases that were replaced. Undo pops one, makes it current and
+writes it. `Rückgängig` sits in the header beside the save confirmation, with `Ctrl+Z` / `Cmd+Z`.
+
+**Why it is this cheap:** every mutation already returns a whole new case rather than editing the
+one it was given, so the case that was replaced is still a complete, valid object that nothing has
+touched. Keeping a reference to it is the entire mechanism. The alternative — an inverse for every
+mutation, so that undoing an `addBolus` performs a removal and undoing a removal performs a restore
+— is more code, and more code that can disagree with the forward direction.
+
+**Considered and rejected: a "Rückgängig" toast** that appears after a change and fades. It looks
+like undo and is not: it is only reachable in the seconds after the action, which is the opposite of
+what an OR needs, where the interruption is the reason the mistake goes unnoticed in the first
+place.
+
+**Decided by Parham: undo restores the audit trail too.** The revisions live inside the case, so
+the restored case carries the revision list it had before the change. A correction that has been
+undone therefore leaves no trace, rather than appearing as "changed to 90, changed back to 81". The
+reasoning: an undo pressed seconds later is someone who had not finished writing the entry, not a
+record being altered after the fact. Everything that survives the session — every correction that
+was allowed to stand — is still in the trail in full.
+
+**Undo is not persisted, deliberately.** It holds the cases in memory only, so a reload starts with
+nothing to undo. A reload is where the record stands as documented.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures
