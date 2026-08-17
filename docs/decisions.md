@@ -502,15 +502,18 @@ sitting at, and the five-minute grid it sits between. Printing either beside eve
 roughly double the label width and halve how many fit, in order to repeat what the chart already
 says. The exact minute is a question about one entry, and the one entry's readout answers it.
 
-**Placement is a search, not an offset** (`src/timeline/labels.ts`). Always-above breaks on the two
-things this chart is made of: a blood pressure measurement is three values a few pixels apart on
-one timestamp, and a dense series puts neighbouring points closer together than their labels are
-wide. Each label takes the first of eight candidate positions that hides nothing and stays inside
-the lane, avoiding the labels already placed, the markers, and the readout box when a point is
-selected. Where the lane is too crowded for a clean arrangement, it takes the least bad position
+**Placement is a search, not an offset** (`src/timeline/labels.ts`). Always-above breaks on a dense
+series, which puts neighbouring points closer together than their labels are wide. Each label takes
+the first of eight candidate positions that hides nothing and stays inside the lane, avoiding the
+labels already placed, the markers, and the readout box when a point is selected. Where the lane is
+too crowded for a clean arrangement, it takes the least bad position
 rather than being dropped: a value drawn over a gridline is still legible, and a value silently
 omitted is a hole in a clinical record. Placement runs left to right so a lane redrawn after a
 correction reads the way it did before.
+
+The other thing that broke always-above — three blood pressures a few pixels apart on one timestamp
+— turned out not to be a placement problem at all, and is settled below by labelling the reading
+rather than its points.
 
 **Relation to the deferred merged view:** this is not it, and it does not replace it. This makes
 one lane readable as numbers; the merged view is about reading *across* lanes, and the cheap step
@@ -594,9 +597,45 @@ cannot get from the record is one it asks for rather than proposes.
 
 ---
 
+## 2026-08-16 — A blood pressure reading is labelled once, not three times
+
+**What:** In reading mode the blood pressure lane draws one box per reading, holding all three
+numbers in the order the markers run — highest at the top. Every other lane still labels a point at
+a time. The grouping is by nearness in time (half a grid interval), with a second point of a kind
+already in the group starting a new one, and it now also drives the systolic–diastolic stroke,
+which used to do its own pairing.
+
+**Why:** three labels for three points eleven pixels apart is not a placement problem, it is an
+unanswerable one. There is no position beside that column that is nearer one of the three markers
+than the other two, so whichever arrangement the search found, the reader still had to guess which
+number went with which point — and because the search takes the first free position, the
+arrangement differed from reading to reading, so there was not even a rule to learn. One box in
+marker order answers it by construction, and it is the same claim the entry sheet makes: this is
+one reading.
+
+**Consequences worth naming:** the busiest lane went from 33 boxes to 11, which is why the
+remaining ones fit cleanly. The label search grew a `prefer: 'side'` hint, because a box three
+lines tall anchored to the middle of a column is either on its own markers or off the lane if it
+tries above or below first. A reading whose middle pressure is selected loses that line from the
+box — the readout is already spelling it out.
+
+**A real bug this surfaced:** `MARKER_BOX` claimed a marker covered 14px when the browser reports
+19–20 — the paths are 11px wide but every marker carries a 2px ring, and a triangle's apex carries
+its stroke past the point. With `GAP` at 7, measured from the same centre, a label placed beside a
+point was sitting on it, and the search could not see the problem because its idea of the obstacle
+was too small. `GAP` is now 12 and `MARKER_BOX` 20, and a test asserts no box covers a marker.
+
+**Rejected:** three labels in a fixed side column, one per point (still three boxes, still relies
+on the reader learning the convention, and degrades to the old scatter as soon as the column is
+crowded). One box in `120/70 (85)` notation on a single line (the notation the sheet uses, but
+about 100px wide against roughly 86px between readings on the demo case — it would not fit, and the
+vertical stack maps to the markers better anyway).
+
+---
+
 ## Open decisions (not yet made)
 
-- **NiBP grouped rendering** on the timeline (see above). Entry is now settled the other way — one
-  reading, three stored entries sharing the timestamp the user set — but how the three are *drawn*
-  together is unchanged: three markers joined by the systolic–diastolic stroke, and in reading mode
-  three separate labels, which is the part that still does not work.
+- **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
+  entries sharing the timestamp the user set; the chart draws them as three markers joined by the
+  systolic–diastolic stroke and labelled as one box. What is still open is whether the *trend*
+  reading of that lane should join the three series into a band rather than three separate lines.

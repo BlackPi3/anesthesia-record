@@ -14,6 +14,10 @@ const SPO2_LANE = /Sauerstoffsättigung, Achse/
 const BLOOD_PRESSURE_LANE = /Blutdruck, Achse/
 
 const toggle = (page: Page) => page.getByRole('button', { name: /^Zahlen / })
+/**
+ * One per number written on the chart. The box a number is written in is `[data-value-box]`, and
+ * there is not one of those per number: a blood pressure reading shares one between three.
+ */
 const labels = (page: Page) => page.locator('[data-value-label]')
 
 /** A press on the lane clear of every point: the gesture that asks for the numbers. */
@@ -67,14 +71,61 @@ test('a tap on the chart writes every value out and takes the trend lines away',
 test('no two values are written over each other', async ({ page }) => {
   await tapEmptyChart(page)
 
+  // Asserted on the boxes rather than the digits: the surfaces are opaque, so one drawn over
+  // another hides a number even where the digits inside them would have missed each other.
   for (const lane of [SPO2_LANE, BLOOD_PRESSURE_LANE]) {
-    const inLane = page.getByRole('group', { name: lane }).locator('[data-value-label]')
-    const boxes = await boxesOf(inLane)
-    expect(boxes.length).toBeGreaterThan(0)
+    const inLane = page.getByRole('group', { name: lane }).locator('[data-value-box]')
+    const drawn = await boxesOf(inLane)
+    expect(drawn.length).toBeGreaterThan(0)
 
-    for (const [i, a] of boxes.entries()) {
-      for (const b of boxes.slice(i + 1)) {
+    for (const [i, a] of drawn.entries()) {
+      for (const b of drawn.slice(i + 1)) {
         expect(overlaps(a, b), `labels at ${a.x},${a.y} and ${b.x},${b.y} overlap`).toBe(false)
+      }
+    }
+  }
+})
+
+/**
+ * The blood pressure lane is the one place where a label per point does not work. Three values
+ * eleven pixels apart leave no position that is nearer one marker than the other two, so which
+ * number belonged to which was a guess. One box per reading, its lines in the order the markers
+ * run, answers it by construction.
+ */
+test('the three pressures of a reading share one box, in marker order', async ({ page }) => {
+  await tapEmptyChart(page)
+
+  const lane = page.getByRole('group', { name: BLOOD_PRESSURE_LANE })
+  const readings = lane.locator('[data-value-box]')
+  const numbers = lane.locator('[data-value-label]')
+
+  // Every pressure is still written; they are written in a third as many boxes.
+  expect(await numbers.count()).toBe((await readings.count()) * 3)
+
+  // Scoped inside one box, which is what says these three numbers are one reading. Highest first,
+  // matching the markers beside them — systolic points up, diastolic points down.
+  const lines = await readings.first().locator('[data-value-label]').allTextContents()
+  const values = lines.map(Number)
+
+  expect(values).toHaveLength(3)
+  expect(values[0]).toBeGreaterThan(values[1])
+  expect(values[1]).toBeGreaterThan(values[2])
+})
+
+/** A box must not be written over a marker either: that hides the point the number is about. */
+test('no value box covers a point', async ({ page }) => {
+  await tapEmptyChart(page)
+
+  for (const lane of [SPO2_LANE, BLOOD_PRESSURE_LANE]) {
+    const group = page.getByRole('group', { name: lane })
+    const drawn = await boxesOf(group.locator('[data-value-box]'))
+    const markers = await boxesOf(group.locator('[data-entry-id]'))
+
+    for (const box of drawn) {
+      for (const marker of markers) {
+        expect(overlaps(box, marker), `a label covers the point at ${marker.x},${marker.y}`).toBe(
+          false,
+        )
       }
     }
   }

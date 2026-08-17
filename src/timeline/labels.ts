@@ -30,13 +30,26 @@ export interface LabelRequest {
   y: number
   width: number
   height: number
+  /**
+   * Try beside the anchor before above or below it.
+   *
+   * For a label covering a whole blood pressure reading, which is anchored to the middle of a
+   * column of points rather than to one point: above and below are where its own markers are, and
+   * a box three lines tall placed there is either on top of them or off the lane.
+   */
+  prefer?: 'side'
 }
 
 /** The placed label: `x`/`y` are now the box's top-left corner, not the point's. */
 export type PlacedLabel = Box & { id: string }
 
-/** Clearance between a label and the point it belongs to. */
-const GAP = 7
+/**
+ * Clearance between a label and the point it is anchored to, measured from the point's centre.
+ *
+ * It has to clear the marker itself, which reaches about ten pixels from that centre once its ring
+ * is counted — a gap smaller than the mark leaves the label sitting on the point it is about.
+ */
+const GAP = 12
 
 /**
  * How much worse it is for a label to leave the lane than to sit over something inside it.
@@ -50,8 +63,8 @@ const OUT_OF_BOUNDS_WEIGHT = 3
  *
  * Above first: it is where a value is written on a paper protocol, and with a series read left to
  * right it keeps every label on one line above the trace. Below is the mirror for points near the
- * top of the axis. The four side positions exist for the blood pressure lane, where three values
- * share an x and the vertical room between them is measured in single pixels.
+ * top of the axis. The six side positions come first for a label that asked for them — see
+ * `prefer` — and are the fallback for everything else.
  */
 function candidates(request: LabelRequest): Box[] {
   const { x, y, width, height } = request
@@ -59,17 +72,23 @@ function candidates(request: LabelRequest): Box[] {
   const above = y - GAP - height
   const below = y + GAP
   const middle = y - height / 2
+  const right = x + GAP
+  const left = x - GAP - width
 
-  return [
+  const over = [
     { x: centre, y: above, width, height },
     { x: centre, y: below, width, height },
-    { x: x + GAP, y: middle, width, height },
-    { x: x - GAP - width, y: middle, width, height },
-    { x: x + GAP, y: above, width, height },
-    { x: x - GAP - width, y: above, width, height },
-    { x: x + GAP, y: below, width, height },
-    { x: x - GAP - width, y: below, width, height },
   ]
+  const beside = [
+    { x: right, y: middle, width, height },
+    { x: left, y: middle, width, height },
+    { x: right, y: above, width, height },
+    { x: left, y: above, width, height },
+    { x: right, y: below, width, height },
+    { x: left, y: below, width, height },
+  ]
+
+  return request.prefer === 'side' ? [...beside, ...over] : [...over, ...beside]
 }
 
 /** Area the two boxes share, zero if they do not touch. */

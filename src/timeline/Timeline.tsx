@@ -102,13 +102,22 @@ const READOUT_HEIGHT = 22
  * this text exists because the chart was not readable as numbers, so it is set at the size of the
  * axis labels rather than smaller. Width is estimated from the character count — these are two to
  * five tabular digits, never prose, so measuring the text in the DOM would buy nothing.
+ *
+ * `LABEL_HEIGHT` is the height of one line. A blood pressure label carries three of them.
  */
 const LABEL_FONT = 13
 const LABEL_HEIGHT = 18
 const LABEL_CHAR_WIDTH = 7.6
 const LABEL_PADDING = 6
-/** The marker's own footprint, which no other point's label may sit on. */
-const MARKER_BOX = 14
+/**
+ * The marker's own footprint, which no label may sit on.
+ *
+ * Twenty, not the eleven the largest marker path spans: every marker is drawn with a 2px ring in
+ * the surface colour, and a triangle's apex carries its stroke out past the point itself. Measured
+ * from what the browser reports rather than from the path, because the search is only as good as
+ * its idea of what is already on the chart.
+ */
+const MARKER_BOX = 20
 
 function labelWidth(text: string): number {
   return text.length * LABEL_CHAR_WIDTH + LABEL_PADDING * 2
@@ -451,29 +460,44 @@ function VitalLane({
       .sort((a, b) => a.at - b.at),
   }))
   const points = seriesByKind.flatMap((series) => series.points)
-  const pointsById = new Map(points.map((point) => [point.id, point]))
   const active = points.find((point) => point.id === (drag?.id ?? selectedId)) ?? null
+
+  /**
+   * What each label covers. Every lane but one labels a point at a time; the blood pressure lane
+   * labels a whole reading, because three numbers eleven pixels apart cannot each be tied to their
+   * own marker by position alone.
+   *
+   * The selected point drops out of its label and its marker stays: its readout already spells the
+   * value out, with the unit and the time the label deliberately drops, and a label beside it would
+   * be the same number twice. A reading whose middle pressure is selected simply loses that line.
+   */
+  const labelled = (lane.id === 'bloodPressure' ? readings(points) : points.map((point) => [point]))
+    .map((reading) => reading.filter((point) => point.id !== active?.id))
+    .filter((reading) => reading.length > 0)
+  const readingsById = new Map(labelled.map((reading) => [reading[0].id, reading]))
 
   /**
    * The numbers, placed against the points as they are currently drawn — so a point being dragged
    * carries its label with it, and a corrected value is written in the moment it changes.
    *
-   * The selected point is left out and its marker is not: its readout already spells the value
-   * out, with the unit and the time the label deliberately drops, and a label beside it would be
-   * the same number twice. The readout box joins the obstacles for the same reason the markers
-   * do — it is opaque, and a value printed under it is a value nobody can read.
+   * The readout box joins the obstacles for the same reason the markers do — it is opaque, and a
+   * value printed under it is a value nobody can read.
    */
   const labels = showValues
     ? placeValueLabels(
-        points
-          .filter((point) => point.id !== active?.id)
-          .map((point) => ({
-            id: point.id,
-            x: point.x,
-            y: point.y,
-            width: labelWidth(formatValue(point.kind, point.value)),
-            height: LABEL_HEIGHT,
-          })),
+        labelled.map((reading) => {
+          const lines = reading.map((point) => formatValue(point.kind, point.value))
+          return {
+            id: reading[0].id,
+            // Anchored to the middle of the column, not to any one of its points: the box belongs
+            // to all of them, and hanging it off the topmost would say it belonged to that one.
+            x: mean(reading.map((point) => point.x)),
+            y: mean(reading.map((point) => point.y)),
+            width: Math.max(...lines.map(labelWidth)),
+            height: reading.length * LABEL_HEIGHT,
+            prefer: reading.length > 1 ? ('side' as const) : undefined,
+          }
+        }),
         [...points.map(markerBox), ...(active ? [readoutBox(active, area)] : [])],
         { x: area.left, y: 0, width: area.right - area.left, height },
       )
@@ -756,7 +780,7 @@ function VitalLane({
       ))}
 
       {lane.id === 'bloodPressure' && (
-        <BloodPressureConnectors seriesByKind={seriesByKind} color={color} />
+        <BloodPressureConnectors readings={readings(points)} color={color} />
       )}
 
       {seriesByKind.map(({ kind, points: series }) => (
@@ -795,17 +819,9 @@ function VitalLane({
       {labels.length > 0 && (
         <g aria-hidden="true" pointerEvents="none">
           {labels.map((label) => {
-            const point = pointsById.get(label.id)
-            if (!point) return null
-            return (
-              <ValueLabel
-                key={label.id}
-                entryId={label.id}
-                box={label}
-                text={formatValue(point.kind, point.value)}
-                color={color}
-              />
-            )
+            const reading = readingsById.get(label.id)
+            if (!reading) return null
+            return <ValueLabel key={label.id} box={label} points={reading} color={color} />
           })}
         </g>
       )}
@@ -870,34 +886,31 @@ function markerBox(point: LanePoint): Box {
 }
 
 /**
- * One measured value, written next to its point.
+ * The measured value or values of one reading, written next to it.
  *
- * The number and nothing else. The unit is at the lane's edge, where it is the same for every
+ * The numbers and nothing else. The unit is at the lane's edge, where it is the same for every
  * point in the lane, and the time is the position on the axis the label is already sitting at —
  * printing either beside every point would double the width of the labels and halve how many of
  * them fit, to repeat what the chart says twice over. The exact minute is a question about one
  * entry, and it is answered by the readout of the point that raised it.
  *
+ * More than one line means a blood pressure reading, and the lines run in the order the markers
+ * do: highest at the top. That order is the whole point of the box — with three values eleven
+ * pixels apart, no arrangement of three separate labels says which number belongs to which marker,
+ * because every position is equally near all three. One box in marker order does.
+ *
  * It carries its own surface, because a number set straight onto the chart is read across
  * gridlines, event rules and the neighbouring lane's ink. The hairline is the lane's colour, which
  * is what ties a label back to its series where two lanes' labels come close.
  */
-function ValueLabel({
-  box,
-  text,
-  color,
-  entryId,
-}: {
-  box: Box
-  text: string
-  color: string
-  entryId: string
-}) {
-  // `data-value-label` rather than `data-entry-id`, for the reason the readout carries its own
-  // hook: the marker for this entry already answers to that one, and a second element under the
-  // same name would make every lookup by entry id ambiguous while the numbers are up.
+function ValueLabel({ box, points, color }: { box: Box; points: LanePoint[]; color: string }) {
+  // Two hooks, with two jobs. `data-value-label` sits on each number, so a test can still ask what
+  // one entry's value is drawn as — and neither goes on the marker, which already answers to
+  // `data-entry-id`. `data-value-box` is the surface, which is what may not be written over
+  // another: the rects are opaque, so two that overlap hide a number even when the digits inside
+  // them would have missed each other.
   return (
-    <g data-value-label={entryId}>
+    <g data-value-box={points[0].id}>
       <rect
         x={box.x}
         y={box.y}
@@ -909,17 +922,21 @@ function ValueLabel({
         stroke={color}
         strokeOpacity={0.4}
       />
-      <text
-        x={box.x + box.width / 2}
-        y={box.y + box.height / 2 + 4.5}
-        fill={chart.ink}
-        fontSize={LABEL_FONT}
-        fontWeight={600}
-        textAnchor="middle"
-        style={{ fontVariantNumeric: 'tabular-nums' }}
-      >
-        {text}
-      </text>
+      {points.map((point, line) => (
+        <text
+          key={point.id}
+          data-value-label={point.id}
+          x={box.x + box.width / 2}
+          y={box.y + line * LABEL_HEIGHT + LABEL_HEIGHT / 2 + 4.5}
+          fill={chart.ink}
+          fontSize={LABEL_FONT}
+          fontWeight={600}
+          textAnchor="middle"
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {formatValue(point.kind, point.value)}
+        </text>
+      ))}
     </g>
   )
 }
@@ -1065,29 +1082,63 @@ function Readout({
   )
 }
 
+/** Arithmetic mean, for anchoring a label to a column of points rather than to one of them. */
+function mean(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0) / values.length
+}
+
+/**
+ * How far apart two pressures may be and still count as one cuff inflation. Half the reference
+ * grid: two readings are minutes apart, and the three numbers of one are the same instant.
+ */
+const READING_TOLERANCE = GRID_INTERVAL_MS / 2
+
+/**
+ * The lane's points, gathered into readings.
+ *
+ * One inflation of a cuff produces three numbers on one timestamp, and the chart has two things to
+ * say about that — the stroke joining systolic to diastolic, and the label carrying all three — so
+ * the grouping is worked out once here and both are drawn from it.
+ *
+ * Grouped on nearness in time rather than on an identical timestamp, because a point that has been
+ * dragged no longer shares its reading's to the millisecond, and a correction must not make the
+ * reading come apart on screen. A second point of a kind already in the group starts a new one: two
+ * systolic values that close together are two readings, not one reading with two tops.
+ *
+ * Each group comes back ordered by height, so a label's lines run in the order its markers do.
+ */
+function readings(points: readonly LanePoint[]): LanePoint[][] {
+  const groups: LanePoint[][] = []
+
+  for (const point of [...points].sort((a, b) => a.at - b.at)) {
+    const open = groups[groups.length - 1]
+    const belongs =
+      open !== undefined &&
+      point.at - open[0].at <= READING_TOLERANCE &&
+      !open.some((member) => member.kind === point.kind)
+
+    if (belongs) open.push(point)
+    else groups.push([point])
+  }
+
+  return groups.map((group) => [...group].sort((a, b) => a.y - b.y))
+}
+
 /** The vertical stroke joining systolic to diastolic, as drawn on a paper protocol. */
 function BloodPressureConnectors({
-  seriesByKind,
+  readings: grouped,
   color,
 }: {
-  seriesByKind: Array<{ kind: VitalKind; points: LanePoint[] }>
+  readings: LanePoint[][]
   color: string
 }) {
-  const systolic = seriesByKind.find((s) => s.kind === 'bloodPressureSystolic')?.points ?? []
-  const diastolic = seriesByKind.find((s) => s.kind === 'bloodPressureDiastolic')?.points ?? []
-
   return (
     <g pointerEvents="none">
-      {systolic.map((high) => {
-        // Pair on nearest time rather than an exact match: once a point has been dragged, the
-        // three pressures no longer share a timestamp.
-        const low = diastolic.reduce<LanePoint | null>((best, candidate) => {
-          if (Math.abs(candidate.at - high.at) > GRID_INTERVAL_MS / 2) return best
-          if (!best) return candidate
-          return Math.abs(candidate.at - high.at) < Math.abs(best.at - high.at) ? candidate : best
-        }, null)
+      {grouped.map((reading) => {
+        const high = reading.find((point) => point.kind === 'bloodPressureSystolic')
+        const low = reading.find((point) => point.kind === 'bloodPressureDiastolic')
+        if (!high || !low) return null
 
-        if (!low) return null
         return (
           <line
             key={high.id}

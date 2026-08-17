@@ -141,11 +141,16 @@ The chart reads two ways. Its normal state is a trace, which is what makes a tre
 on the chart itself drops the lines and writes every measured value beside its point, because a
 position on an axis is not a number. The labels carry the value alone — the unit is at the lane's
 edge and the time is the position they already sit at — and where each one goes is a search, not a
-fixed offset: three blood pressures share one timestamp a few pixels apart, and neighbouring points
-in a dense series sit closer together than their labels are wide. [`labels.ts`](src/timeline/labels.ts)
-gives each label the first of eight candidate positions that hides nothing and stays inside the
-lane, avoiding the markers, the labels already placed, and the readout of a selected point. It is
-pure geometry, tested with numbers like the scales are.
+fixed offset, because neighbouring points in a dense series sit closer together than their labels
+are wide. [`labels.ts`](src/timeline/labels.ts) gives each label the first of eight candidate
+positions that hides nothing and stays inside the lane, avoiding the markers, the labels already
+placed, and the readout of a selected point. It is pure geometry, tested with numbers like the
+scales are.
+
+The blood pressure lane labels a whole reading rather than each of its points: one box, the three
+numbers in the order the markers run. Three values eleven pixels apart leave no position that is
+nearer one marker than the other two, so a label per point could only be guessed at — and the
+guess changed from reading to reading.
 
 Colours are the four categorical slots in fixed order, one per lane, validated for colour-vision
 separation against the surface. Two of them fall below 3:1 contrast, so identity never rests on
