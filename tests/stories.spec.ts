@@ -84,9 +84,7 @@ test.beforeEach(async ({ page }) => {
 test('story: record a value and correct it on the timeline', async ({ page }, info) => {
   await page.waitForTimeout(BEAT)
 
-  await page.getByRole('button', { name: /Erfassen/ }).click()
-  await sheet(page).getByRole('button', { name: /^Wert/ }).click()
-  await sheet(page).getByRole('button', { name: /Sauerstoffsättigung/ }).click()
+  await page.getByRole('button', { name: 'Sauerstoffsättigung erfassen' }).click()
   await page.waitForTimeout(BEAT)
 
   // The steppers move by the metric's own step, so the number is exact by construction.
@@ -129,8 +127,7 @@ test('story: record a bolus', async ({ page }, info) => {
   const before = await storedEntries(page, 'bolus')
   await page.waitForTimeout(BEAT)
 
-  await page.getByRole('button', { name: /Erfassen/ }).click()
-  await sheet(page).getByRole('button', { name: /^Medikament/ }).click()
+  await page.getByRole('button', { name: 'Medikament erfassen' }).click()
   await sheet(page).getByRole('button', { name: 'Fentanyl' }).click()
   await page.waitForTimeout(BEAT)
 
@@ -159,8 +156,7 @@ test('story: record a bolus', async ({ page }, info) => {
 test('story: run an infusion, stop it, then undo the stop', async ({ page }, info) => {
   await page.waitForTimeout(BEAT)
 
-  await page.getByRole('button', { name: /Erfassen/ }).click()
-  await sheet(page).getByRole('button', { name: /^Medikament/ }).click()
+  await page.getByRole('button', { name: 'Medikament erfassen' }).click()
   await sheet(page).getByText('Dauerinfusion', { exact: true }).click()
   await sheet(page).getByRole('button', { name: 'NaCl 0,9 %' }).click()
   await page.waitForTimeout(BEAT)

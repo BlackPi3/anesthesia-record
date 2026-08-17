@@ -96,9 +96,8 @@ test('undo brings back a removed value', async ({ page }) => {
 test('undo takes back a newly recorded entry', async ({ page }) => {
   const before = await storedCount(page, 'event')
 
-  await page.getByRole('button', { name: /Erfassen/ }).click()
+  await page.getByRole('button', { name: 'Ereignis erfassen' }).click()
   const sheet = page.getByRole('dialog')
-  await sheet.getByRole('button', { name: /^Ereignis/ }).click()
   await sheet.getByRole('button', { name: 'Schnitt' }).click()
   await sheet.getByRole('button', { name: 'Übernehmen' }).click()
   await expect(page.getByRole('dialog')).toBeHidden()

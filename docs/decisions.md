@@ -38,6 +38,10 @@ to be genuinely precise and direct to compensate.
 rather than real-time). Tap anywhere on screen with no curve involvement at all (loses the
 graphical-input requirement entirely).
 
+**Revised on 2026-08-16:** the reasoning holds, the single button does not. Entry starts from a
+button per row rather than one prominent "+", which keeps the button-with-current-time shape while
+letting the row rather than a picker say what is being entered.
+
 ---
 
 ## 2026-08-07 — NiBP entered as three separate single-value entries
@@ -51,6 +55,9 @@ quick, consistent single-value entries using the same control as every other met
 
 **Open follow-up:** how three same-timestamp BP points render together on the timeline (e.g. as
 one grouped mark vs. three separate dots) is a rendering decision, not yet made.
+
+**Superseded on 2026-08-16** for entry — see below. The storage half stands unchanged: three
+single-value entries is still what a reading becomes.
 
 ---
 
@@ -325,6 +332,10 @@ attached by hand instead of as a JSX prop.
 
 ## 2026-08-16 — One entry flow for three kinds of entry, in three steps
 
+**Superseded the same day by the per-row entry buttons below.** The two picker steps are gone; what
+survives is everything from *Amounts open on the last one recorded* onward, which the row buttons
+inherited unchanged.
+
 **What:** The "+" opens a three-way choice (Wert / Medikament / Ereignis), then the picker for that
 kind, then the form. Medications choose Bolus or Dauerinfusion before the drug, since that decides
 whether the form asks for a dose or a rate.
@@ -507,7 +518,85 @@ noted there — a shared time cursor — is still the cheap step.
 
 ---
 
+## 2026-08-16 — The row is the button: one „Erfassen“ per lane and band
+
+**What:** The floating "+" is gone, and with it the screen that asked what kind of entry this was
+and the picker that asked which metric. Every lane and both bands carry their own „Erfassen“
+button. A single-metric lane opens straight on its value control; the medication and event bands
+open on their picker, because a drug and a milestone are lists rather than rows on the chart.
+
+**Why:** the two steps the "+" needed were both asking the user to name something already drawn on
+the screen. Pointing at the saturation lane says "a saturation" more directly than reading `Wert`,
+then `SpO₂`, off a list — and it is the same act as pointing at a point to correct one, which the
+chart already teaches. It takes the common entry from three taps to one. The decision of
+2026-08-16 above, which bought a shorter first screen with one extra tap on every entry, is
+superseded: the cost it accepted is gone, and so is the screen it was paying for.
+
+**Where the buttons sit:** a lane's button is in its own gutter, under the lane name and unit. The
+gutter already belongs to the lane and holds nothing below the label, so a row costs no height,
+where six buttons stacked in the flow would have added roughly half an iPad screen to a chart that
+already fills one. Pinned under the label rather than at the foot of the lane: a lane is taller
+than its name, and a button at the bottom of one sits nearer the *next* lane's name than its own.
+The bands' gutters hold their rows' drug names, so their buttons go beneath them instead.
+
+**The bands now render when empty**, down to their heading, because the heading is what names the
+button under it — and on a record with nothing in it the six headings are the six things this
+protocol can hold.
+
+**Naming:** all six read „+ Erfassen“ / „+ Medikament“ / „+ Ereignis“, and each carries an
+accessible name that includes its row („Sauerstoffsättigung erfassen“). The row above says which
+one this is; a list of controls read aloud has no row above it, so the spoken name carries it.
+
+**Rejected:** buttons in the flow beneath each lane (unambiguous, but the height). One button per
+lane *inside* the SVG (an SVG cannot hold a real button, and a faked one is unreachable by
+keyboard and unnamed to a screen reader).
+
+---
+
+## 2026-08-16 — NiBP entered as one reading, stored as three entries
+
+**What:** Supersedes the entry half of the 2026-08-07 decision. Pressing „Blutdruck erfassen“ opens
+one sheet with systolic, mean and diastolic on it and one timestamp. Each of the three has a
+`gemessen` checkbox and can be left out. Saving writes one ordinary vital entry per pressure that
+was measured, all on the shared timestamp, in a single case-to-case step.
+
+**Why the entry is combined:** an oscillometric cuff inflates once and reports all three numbers
+from that single inflation; an arterial line derives all three from one waveform. They are not
+three measurements that happen to fall in the same minute, they are one measurement reported three
+ways, and the monitor shows them as one item. The 2026-08-07 decision was made when every entry
+began at a flat picker, where three trips cost the same as any other three entries. With a
+per-lane button, three trips would have meant re-introducing a picker step on this lane alone and
+making its button behave unlike the other three.
+
+**Why each one can be switched off:** the other way of taking a pressure is a manual cuff and a
+stethoscope, which gives a systolic and a diastolic and no mean at all. Requiring the mean would
+mean typing a number nobody measured; calculating it from the other two would be the app producing
+a clinical value, which the brief rules out. `nicht gemessen` is the third option, and it is the
+honest one.
+
+**Why the storage is unchanged:** three vital entries, as before. The lane draws them as three
+series, a correction afterwards touches exactly one of them — which is the real case for keeping
+them apart: noticing later that one of the three was an artefact. Nothing downstream had to learn
+about a compound entry type. Because the three are added by folding over one `addVital`, the whole
+reading is one step in the undo stack.
+
+**The notation.** The sheet's readout is `120/70 (85)` — systolic over diastolic, mean in brackets,
+which is how it is written and how it is said. That is deliberately not the order of the rows below
+it, which run systolic, mean, diastolic to match how the three sit on the lane: highest at the top.
+A pressure that is not being measured prints as `–` rather than dropping out, so the notation keeps
+its shape and an absent mean is visibly absent.
+
+**Opening values.** The first reading of a case has nothing to copy, so it opens on the
+pre-operative values already in the header — a real measurement of this patient, not an invented
+one. There is no pre-operative mean, and three mid-axis defaults read `130/130 (130)`, which is not
+a blood pressure; so a pressure the case knows nothing about opens *switched off*. A number the app
+cannot get from the record is one it asks for rather than proposes.
+
+---
+
 ## Open decisions (not yet made)
 
-- **NiBP grouped rendering** on the timeline (see above). Entry is settled: the three pressures
-  are three trips through the same flow, sharing nothing but a timestamp the user sets.
+- **NiBP grouped rendering** on the timeline (see above). Entry is now settled the other way — one
+  reading, three stored entries sharing the timestamp the user set — but how the three are *drawn*
+  together is unchanged: three markers joined by the systolic–diastolic stroke, and in reading mode
+  three separate labels, which is the part that still does not work.

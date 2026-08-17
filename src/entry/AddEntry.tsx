@@ -1,14 +1,15 @@
 /**
- * Creating an entry: the "+" button and the sheet it opens.
+ * Creating an entry: the sheet a row's own „Erfassen“ button opens.
  *
- * Three steps, deliberately, rather than one dense form. What kind of thing is being written down
- * is a glance-and-tap decision, which one of them it is is another, and setting the value is a
- * careful one. Putting them on screen together makes the careful step compete with two choices
- * already finished with, so whichever step is live owns the sheet.
+ * There used to be one floating "+" and a first screen asking what kind of thing was being written
+ * down. That screen is gone, and so is the metric picker behind it, because the button already
+ * answers both questions: it sits on the row it writes into. A saturation is now one tap to the
+ * value control instead of three, and the choice is made by pointing at the thing on the chart
+ * rather than by reading a list of names for it.
  *
- * The cost is one tap more than a single flat chooser would need. It buys a first screen that
- * stays short as the catalog grows, and a picker per kind that can look like what it is picking —
- * metrics carry their lane colour, drugs do not.
+ * What is left is only what a button cannot say. Medications ask how the drug is given and which
+ * one, milestones ask which; those are lists, not rows, and there is nothing on the chart to aim
+ * at before the first one exists.
  *
  * Values open on the last one recorded for the same metric or drug in this case, rather than at
  * the middle of the scale. Vitals move gradually and doses repeat, so the previous entry is
@@ -21,114 +22,93 @@ import { useState } from 'react'
 import { Button, Drawer, Segmented } from 'antd'
 
 import {
+  BLOOD_PRESSURE_KINDS,
   DRUGS,
   FLUIDS,
   PHASE_EVENTS,
   PHASE_EVENT_ORDER,
   VITALS,
-  VITAL_ORDER,
-  laneForVital,
 } from '../domain/catalog'
 import { caseNow, medications, vitalSeries } from '../domain/entries'
 import type {
   AnesthesiaCase,
+  Baseline,
   BolusEntry,
   InfusionEntry,
   PhaseEventKind,
   VitalKind,
 } from '../domain/types'
-import { laneColor } from '../theme'
 import { snapToStep } from '../timeline/scales'
+import { BloodPressureForm } from './BloodPressureForm'
 import { EntryForm } from './EntryForm'
-import { draftTitle, isComplete, type Draft } from './draft'
-
-/** The three families the "+" button offers, in the order they appear. */
-const FAMILIES = [
-  { id: 'vital', label: 'Wert', note: 'Vitalparameter' },
-  { id: 'medication', label: 'Medikament', note: 'Bolus oder Dauerinfusion' },
-  { id: 'event', label: 'Ereignis', note: 'Phase oder Zeitpunkt' },
-] as const
-
-type Family = (typeof FAMILIES)[number]['id']
+import {
+  draftTitle,
+  isComplete,
+  type BloodPressureDraft,
+  type Draft,
+  type NewDraft,
+} from './draft'
+import type { AddTarget } from './target'
 
 /** How a medication is given. Chosen before the drug, since it decides what the form asks for. */
 type MedicationMode = 'bolus' | 'infusion'
 
 export interface AddEntryProps {
   record: AnesthesiaCase
-  onAdd: (draft: Draft) => void
+  /** What was pressed. The sheet is rendered only while something is being added. */
+  target: AddTarget
+  onAdd: (draft: NewDraft) => void
+  onClose: () => void
 }
 
-export function AddEntry({ record, onAdd }: AddEntryProps) {
-  const [open, setOpen] = useState(false)
-  const [family, setFamily] = useState<Family | null>(null)
+/**
+ * Rendered only while an entry is being created, and keyed on the target by the caller — the same
+ * arrangement `EditEntry` uses, and for the same reason: the draft can live in a plain state
+ * initialiser, with no effect copying one prop into it.
+ */
+export function AddEntry({ record, target, onAdd, onClose }: AddEntryProps) {
   const [mode, setMode] = useState<MedicationMode>('bolus')
-  const [draft, setDraft] = useState<Draft | null>(null)
+  const [draft, setDraft] = useState<NewDraft | null>(() => openingDraft(record, target))
+  // A picker is a step that can be gone back to. A row's button has no step behind it, so its
+  // sheet offers a way out rather than a way back.
+  const picks = target.kind === 'medication' || target.kind === 'event'
 
-  function start() {
-    // Reset on open, not on close: a sheet that rebuilds its state as it disappears animates the
-    // reset in front of the user.
-    setFamily(null)
-    setMode('bolus')
-    setDraft(null)
-    setOpen(true)
-  }
-
-  /** One step back, or out of the sheet entirely if there is nowhere left to go. */
   function back() {
-    if (draft !== null) return setDraft(null)
-    if (family !== null) return setFamily(null)
-    setOpen(false)
+    if (picks && draft !== null) return setDraft(null)
+    onClose()
   }
 
   function commit() {
     if (draft === null || !isComplete(draft)) return
     onAdd(draft)
-    setOpen(false)
+    onClose()
   }
 
   return (
-    <>
-      <Button type="primary" size="large" className="add-entry__open" onClick={start}>
-        + Erfassen
-      </Button>
-
-      <Drawer
-        open={open}
-        onClose={() => setOpen(false)}
-        placement="bottom"
-        height="auto"
-        title={draft === null ? 'Erfassen' : draftTitle(draft)}
-        className="entry-sheet"
-        // The step back has to sit where a thumb already is, not only in the title bar.
-        footer={
-          family === null ? null : (
-            <div className="entry-sheet__footer">
-              <Button size="large" onClick={back}>
-                Zurück
-              </Button>
-              {draft !== null && (
-                <Button
-                  size="large"
-                  type="primary"
-                  disabled={!isComplete(draft)}
-                  onClick={commit}
-                >
-                  Übernehmen
-                </Button>
-              )}
-            </div>
-          )
-        }
-      >
-        <div className="entry-sheet__body">
-          {draft !== null ? (
-            <EntryForm record={record} draft={draft} onChange={setDraft} />
-          ) : family === null ? (
-            <FamilyPicker onPick={setFamily} />
-          ) : family === 'vital' ? (
-            <MetricPicker onPick={(kind) => setDraft(newVital(record, kind))} />
-          ) : family === 'medication' ? (
+    <Drawer
+      open
+      onClose={onClose}
+      placement="bottom"
+      height="auto"
+      title={draft === null ? pickerTitle(target) : draftTitle(draft)}
+      className="entry-sheet"
+      // The step back has to sit where a thumb already is, not only in the title bar.
+      footer={
+        <div className="entry-sheet__footer">
+          <Button size="large" onClick={back}>
+            {picks && draft !== null ? 'Zurück' : 'Abbrechen'}
+          </Button>
+          {draft !== null && (
+            <Button size="large" type="primary" disabled={!isComplete(draft)} onClick={commit}>
+              Übernehmen
+            </Button>
+          )}
+        </div>
+      }
+    >
+      <div className="entry-sheet__body">
+        {draft === null ? (
+          target.kind === 'medication' ? (
             <MedicationPicker
               mode={mode}
               onMode={setMode}
@@ -136,25 +116,84 @@ export function AddEntry({ record, onAdd }: AddEntryProps) {
             />
           ) : (
             <EventPicker onPick={(event) => setDraft(newEvent(record, event))} />
-          )}
-        </div>
-      </Drawer>
-    </>
+          )
+        ) : draft.type === 'bloodPressure' ? (
+          <BloodPressureForm record={record} draft={draft} onChange={setDraft} />
+        ) : (
+          <EntryForm record={record} draft={draft} onChange={setDraft} />
+        )}
+      </div>
+    </Drawer>
   )
 }
 
+/** What a picker step is titled. A drafted entry titles itself, through `draftTitle`. */
+function pickerTitle(target: AddTarget): string {
+  return target.kind === 'medication' ? 'Medikament' : 'Ereignis'
+}
+
 // ---------------------------------------------------------------------------
-// What a freshly picked entry opens on
+// What a freshly opened sheet starts on
 // ---------------------------------------------------------------------------
 
-function newVital(record: AnesthesiaCase, vital: VitalKind): Draft {
+/** The draft a button opens straight into, or nothing where a picker comes first. */
+function openingDraft(record: AnesthesiaCase, target: AddTarget): NewDraft | null {
+  if (target.kind === 'vital') return newVital(record, target.vital)
+  if (target.kind === 'bloodPressure') return newBloodPressure(record)
+  return null
+}
+
+/**
+ * A number this case already holds for the metric: its last reading, or failing that the
+ * pre-operative value in the header.
+ *
+ * The baseline covers systolic, diastolic and heart rate, and it is matched by name — its fields
+ * are named after the vitals deliberately. It is a real measurement of this patient rather than a
+ * plausible number invented for the control, which is the whole difference between a starting
+ * point and a suggestion.
+ */
+function lastKnown(record: AnesthesiaCase, vital: VitalKind): number | null {
   const series = vitalSeries(record, vital)
+  if (series.length > 0) return series[series.length - 1].value
+
+  return vital in record.baseline ? record.baseline[vital as keyof Baseline] : null
+}
+
+/** The value a metric's control opens on. The middle of the range is the last resort. */
+function openingValue(record: AnesthesiaCase, vital: VitalKind): number {
+  const known = lastKnown(record, vital)
+  if (known !== null) return known
+
   const meta = VITALS[vital]
   const [min, max] = meta.plotRange
-  const value =
-    series.length > 0 ? series[series.length - 1].value : snapToStep((min + max) / 2, meta.step)
+  return snapToStep((min + max) / 2, meta.step)
+}
 
-  return { type: 'vital', vital, at: caseNow(record), value }
+function newVital(record: AnesthesiaCase, vital: VitalKind): Draft {
+  return { type: 'vital', vital, at: caseNow(record), value: openingValue(record, vital) }
+}
+
+/**
+ * A reading opens on the three numbers the case already knows, switched on.
+ *
+ * On, because a monitor cuff reports all three and that is the case to optimise for; the manual
+ * cuff, where the mean is genuinely absent, costs one tap to switch off.
+ *
+ * A kind the case knows nothing about opens switched *off* instead, which in practice is the mean
+ * on the first reading of a case — there is no pre-operative mean in the header. The alternative
+ * is the middle of the axis, and three of those read `130/130 (130)`, which is not a blood
+ * pressure. A number the app cannot get from the record is one it has to ask for rather than
+ * propose, and switched off is how it asks.
+ */
+function newBloodPressure(record: AnesthesiaCase): BloodPressureDraft {
+  const readings = Object.fromEntries(
+    BLOOD_PRESSURE_KINDS.map((kind) => [
+      kind,
+      { value: openingValue(record, kind), measured: lastKnown(record, kind) !== null },
+    ]),
+  ) as BloodPressureDraft['readings']
+
+  return { type: 'bloodPressure', at: caseNow(record), readings }
 }
 
 /** The most recent entry of this drug given the same way, which a repeat dose can start from. */
@@ -202,53 +241,6 @@ function newEvent(record: AnesthesiaCase, event: PhaseEventKind): Draft {
 // ---------------------------------------------------------------------------
 // Pickers
 // ---------------------------------------------------------------------------
-
-function FamilyPicker({ onPick }: { onPick: (family: Family) => void }) {
-  return (
-    <div className="picker" role="group" aria-label="Art des Eintrags auswählen">
-      {FAMILIES.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          className="picker__tile"
-          onClick={() => onPick(option.id)}
-        >
-          <span className="picker__lead">{option.label}</span>
-          <span className="picker__note">{option.note}</span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-/**
- * The six metrics as large targets, each carrying the colour of the lane it will be drawn in, so
- * the choice made here and the point that appears on the chart are visibly the same thing. The
- * colour is an accent on a bordered tile, never the only thing distinguishing one tile from
- * another — the label does that.
- */
-function MetricPicker({ onPick }: { onPick: (kind: VitalKind) => void }) {
-  return (
-    <div className="picker" role="group" aria-label="Vitalparameter auswählen">
-      {VITAL_ORDER.map((kind) => {
-        const meta = VITALS[kind]
-        return (
-          <button
-            key={kind}
-            type="button"
-            className="picker__tile picker__tile--accented"
-            style={{ '--accent': laneColor[laneForVital(kind).id] } as React.CSSProperties}
-            onClick={() => onPick(kind)}
-          >
-            <span className="picker__lead">{meta.short}</span>
-            <span className="picker__label">{meta.label}</span>
-            <span className="picker__note">{meta.unit}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 /**
  * How the drug is given, then which drug.

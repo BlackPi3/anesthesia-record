@@ -19,6 +19,7 @@ import { createDemoCase } from './domain/demoCase'
 import { AddEntry } from './entry/AddEntry'
 import { EditEntry } from './entry/EditEntry'
 import { addDraft, correctDraft } from './entry/draft'
+import { targetKey, type AddTarget } from './entry/target'
 import { correctVital, removeEntry } from './domain/mutations'
 import { loadCase, saveCase } from './domain/storage'
 import type { AnesthesiaCase } from './domain/types'
@@ -74,6 +75,8 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   // An entry undone out of the record stops being found here, which closes the sheet on its own.
   const editing = record.entries.find((entry) => entry.id === editingId) ?? null
+  // Which row's button was pressed, and nothing more: the sheet works out what that opens on.
+  const [adding, setAdding] = useState<AddTarget | null>(null)
 
   useKeyboardUndo(undo)
 
@@ -86,11 +89,21 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
           onCorrect={(id, next) => update(correctVital(record, id, next))}
           onRemove={(id) => update(removeEntry(record, id))}
           onEdit={setEditingId}
+          onAdd={setAdding}
         />
       </main>
-      <div className="app__actions">
-        <AddEntry record={record} onAdd={(draft) => update(addDraft(record, draft))} />
-      </div>
+
+      {adding !== null && (
+        // Keyed on the target for the reason the editing sheet is keyed on the entry: pressing a
+        // different row while one sheet is open has to open on that row, not on the one before.
+        <AddEntry
+          key={targetKey(adding)}
+          record={record}
+          target={adding}
+          onAdd={(draft) => update(addDraft(record, draft))}
+          onClose={() => setAdding(null)}
+        />
+      )}
 
       {editing !== null && (
         // Keyed on the entry so the sheet mounts fresh for each one and seeds its draft from

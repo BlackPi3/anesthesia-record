@@ -25,9 +25,8 @@ async function storedEntries(page: Page, type: string) {
 /** The sheet, which every selector is scoped to: the bands expose buttons with the same names. */
 const sheet = (page: Page) => page.getByRole('dialog')
 
-async function openSheet(page: Page, family: RegExp) {
-  await page.getByRole('button', { name: /Erfassen/ }).click()
-  await sheet(page).getByRole('button', { name: family }).click()
+async function openSheet(page: Page, band: 'Medikament' | 'Ereignis') {
+  await page.getByRole('button', { name: `${band} erfassen` }).click()
 }
 
 async function commit(page: Page) {
@@ -42,7 +41,7 @@ test.beforeEach(async ({ page }) => {
 test('records a bolus with its dose, unit and time', async ({ page }) => {
   const before = await storedEntries(page, 'bolus')
 
-  await openSheet(page, /^Medikament/)
+  await openSheet(page, 'Medikament')
   await sheet(page).getByRole('button', { name: 'Midazolam' }).click()
 
   // Nothing may be saved until an amount is set: a dose of zero is not a dose, and the control
@@ -65,7 +64,7 @@ test('records a bolus with its dose, unit and time', async ({ page }) => {
 })
 
 test('records a fluid as an infusion that is still running', async ({ page }) => {
-  await openSheet(page, /^Medikament/)
+  await openSheet(page, 'Medikament')
   await sheet(page).getByText('Dauerinfusion', { exact: true }).click()
   await sheet(page).getByRole('button', { name: 'NaCl 0,9 %' }).click()
 
@@ -102,7 +101,7 @@ test('tapping a medication in the band opens it prefilled and corrects it', asyn
 
 test('a running infusion can be stopped from the band', async ({ page }) => {
   // Create one that is running, since both demo infusions are already finished.
-  await openSheet(page, /^Medikament/)
+  await openSheet(page, 'Medikament')
   await sheet(page).getByText('Dauerinfusion', { exact: true }).click()
   await sheet(page).getByRole('button', { name: 'Glucose 5 %' }).click()
   await sheet(page).getByRole('button', { name: 'Rate erhöhen' }).click()
@@ -128,7 +127,7 @@ test('records a phase event and shows it in the band', async ({ page }) => {
   // repeat.
   await expect(page.getByRole('button', { name: /^Naht, / })).toHaveCount(1)
 
-  await openSheet(page, /^Ereignis/)
+  await openSheet(page, 'Ereignis')
   await sheet(page).getByRole('button', { name: 'Naht' }).click()
   await commit(page)
 

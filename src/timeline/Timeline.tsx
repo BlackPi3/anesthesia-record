@@ -14,8 +14,14 @@
  * Two ways in, because the two halves of the chart are not the same kind of thing. A vital is a
  * number on an axis, so it is corrected where it is: press the point, drag it, release. A
  * medication or a milestone is a drug, a dose, a unit and a time, none of which a drag can
- * express, so the bands hand their entries to the entry sheet instead. Creation for all of them
- * runs through the "+" flow.
+ * express, so the bands hand their entries to the entry sheet instead.
+ *
+ * Creating is per row. Every lane and both bands carry their own „Erfassen“ button, so what is
+ * being written down is chosen by pointing at the row it belongs to rather than by naming it in a
+ * list — which is why the entry sheet no longer opens on a chooser. A lane's button sits in its
+ * gutter, under the name and the unit: that space is already the lane's and is otherwise empty, and
+ * six buttons stacked between the lanes would add half a screen of height to a chart that fills an
+ * iPad. The bands' gutters hold their rows' own labels, so their buttons sit beneath them instead.
  *
  * The chart also reads two ways. Its normal state is a trace: points joined into a line, which is
  * what makes a trend visible and is the reason to draw vitals at all. But a protocol is also read
@@ -38,6 +44,7 @@ import {
 import { medications, phaseEvents, visibleEntries, vitalSeries } from '../domain/entries'
 import type { AnesthesiaCase, PhaseEventEntry, Timestamp, VitalKind } from '../domain/types'
 import type { LaneDef } from '../domain/catalog'
+import { targetForLane, type AddTarget } from '../entry/target'
 import { formatTime, formatNumber, formatValue } from '../format'
 import { chart, laneColor } from '../theme'
 import { useElementWidth } from '../useElementWidth'
@@ -115,9 +122,11 @@ export interface TimelineProps {
   onRemove: (id: string) => void
   /** Asks for an entry to be opened for editing: the bands' only route in, and a vital's readout. */
   onEdit: (id: string) => void
+  /** Asks for a new entry on one row. Every lane and both bands raise this. */
+  onAdd: (target: AddTarget) => void
 }
 
-export function Timeline({ record, onCorrect, onRemove, onEdit }: TimelineProps) {
+export function Timeline({ record, onCorrect, onRemove, onEdit, onAdd }: TimelineProps) {
   const [ref, width] = useElementWidth<HTMLDivElement>()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // Held here rather than per lane: "show me the numbers" is a way of reading the record, not a
@@ -152,24 +161,49 @@ export function Timeline({ record, onCorrect, onRemove, onEdit }: TimelineProps)
           )}
           <TimeAxis width={width} window={window} />
           {LANES.map((lane) => (
-            <VitalLane
-              key={lane.id}
-              lane={lane}
-              width={width}
-              window={window}
-              record={record}
-              events={events}
-              selectedId={selectedId}
-              showValues={showValues}
-              onSelect={setSelectedId}
-              onToggleValues={() => setShowValues((shown) => !shown)}
-              onCorrect={onCorrect}
-              onRemove={onRemove}
-              onEdit={onEdit}
-            />
+            // The wrapper is what the lane's own button is positioned against, which is why it is
+            // here rather than inside `VitalLane`: an SVG cannot hold a real button, and the button
+            // has to be a real one to be reachable by keyboard and named to a screen reader.
+            <div key={lane.id} className="timeline__row">
+              <VitalLane
+                lane={lane}
+                width={width}
+                window={window}
+                record={record}
+                events={events}
+                selectedId={selectedId}
+                showValues={showValues}
+                onSelect={setSelectedId}
+                onToggleValues={() => setShowValues((shown) => !shown)}
+                onCorrect={onCorrect}
+                onRemove={onRemove}
+                onEdit={onEdit}
+              />
+              <AddButton
+                className="timeline__add timeline__add--gutter"
+                label="Erfassen"
+                name={`${lane.label} erfassen`}
+                onClick={() => onAdd(targetForLane(lane))}
+              />
+            </div>
           ))}
+
           <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
+          <AddButton
+            className="timeline__add"
+            label="Medikament"
+            name="Medikament erfassen"
+            onClick={() => onAdd({ kind: 'medication' })}
+          />
+
           <EventBand width={width} window={window} events={events} onEdit={onEdit} />
+          <AddButton
+            className="timeline__add"
+            label="Ereignis"
+            name="Ereignis erfassen"
+            onClick={() => onAdd({ kind: 'event' })}
+          />
+
           {visibleEntries(record).length === 0 && <EmptyRecord />}
         </>
       )}
@@ -198,10 +232,41 @@ function EmptyRecord() {
       <div className="timeline__empty-card">
         <p className="timeline__empty-title">Noch keine Einträge</p>
         <p className="timeline__empty-hint">
-          Werte, Medikamente und Ereignisse über „+ Erfassen“ aufnehmen.
+          Über „Erfassen“ an der jeweiligen Zeile aufnehmen.
         </p>
       </div>
     </div>
+  )
+}
+
+/**
+ * A row's own way of starting an entry.
+ *
+ * The visible word is the same on all six, because the row above it already says which one this is
+ * and repeating the lane's name under the lane's name is ink for nothing. The accessible name is
+ * not the same on any two: it carries the row, so the buttons are told apart in a list of controls
+ * where the chart above them is not there to be seen. The visible text is contained in it, which is
+ * what keeps the two readings of the button the same button.
+ *
+ * The „+“ is decoration and marked as such — it repeats what "Erfassen" already says, and spoken
+ * aloud in front of every one of these it is noise.
+ */
+function AddButton({
+  className,
+  label,
+  name,
+  onClick,
+}: {
+  className: string
+  label: string
+  name: string
+  onClick: () => void
+}) {
+  return (
+    <Button size="small" className={className} aria-label={name} onClick={onClick}>
+      <span aria-hidden="true">+ </span>
+      {label}
+    </Button>
   )
 }
 
@@ -1104,8 +1169,9 @@ function MedicationBand({
   onEdit: (id: string) => void
 }) {
   const rows = medications(record)
-  if (rows.length === 0) return null
-
+  // The band stays when it is empty, down to its heading. It is what the button beneath it is
+  // labelled by, and on a record with nothing in it the six headings are the six things this
+  // protocol can hold — which is more use than four lanes and two loose buttons.
   const height = rows.length * MED_ROW_HEIGHT + 28
   const scale = createLaneScales(
     { left: GUTTER, right: width - RIGHT_PAD, top: 0, bottom: 0 },
@@ -1228,9 +1294,8 @@ function EventBand({
   events: PhaseEventEntry[]
   onEdit: (id: string) => void
 }) {
-  if (events.length === 0) return null
-
-  const height = 24 + EVENT_ROW_HEIGHT * 2
+  // Kept when empty for the reason the medication band is: it heads the button below it.
+  const height = events.length === 0 ? 24 : 24 + EVENT_ROW_HEIGHT * 2
   const scale = createLaneScales(
     { left: GUTTER, right: width - RIGHT_PAD, top: 0, bottom: 0 },
     window,

@@ -31,9 +31,32 @@ export interface ValueFieldProps {
   amount: AmountMeta
   value: number
   onChange: (value: number) => void
+  /**
+   * The slider's id, which the readout points at. Defaulted because most sheets hold one of these;
+   * a sheet holding several has to name them apart, or every readout would label the first slider.
+   */
+  id?: string
+  /**
+   * Controls only, with the caller printing the number itself.
+   *
+   * A blood pressure sheet holds three of these, and three 56px readouts do not fit on an iPad —
+   * nor should they, because the three numbers are one reading and belong under one heading. The
+   * promise the full control makes still holds at the level of the screen: the number being set is
+   * on it, large, the whole time.
+   */
+  compact?: boolean
+  /** A value that exists but is not going to be written, such as a mean no cuff measured. */
+  disabled?: boolean
 }
 
-export function ValueField({ amount: meta, value, onChange }: ValueFieldProps) {
+export function ValueField({
+  amount: meta,
+  value,
+  onChange,
+  id = 'value-field-slider',
+  compact = false,
+  disabled = false,
+}: ValueFieldProps) {
   const { min, max } = meta
 
   function nudge(direction: number) {
@@ -41,33 +64,36 @@ export function ValueField({ amount: meta, value, onChange }: ValueFieldProps) {
   }
 
   return (
-    <div className="value-field">
+    <div className={compact ? 'value-field value-field--compact' : 'value-field'}>
       {/* `output` is the element for a value the interface computed, and it announces changes to
           a screen reader without a live region of our own. */}
-      <output className="value-field__readout" htmlFor="value-field-slider">
-        <span className="value-field__number">{formatNumber(value, meta.decimals)}</span>
-        <span className="value-field__unit">{meta.unit}</span>
-      </output>
+      {!compact && (
+        <output className="value-field__readout" htmlFor={id}>
+          <span className="value-field__number">{formatNumber(value, meta.decimals)}</span>
+          <span className="value-field__unit">{meta.unit}</span>
+        </output>
+      )}
 
       <div className="value-field__controls">
         <Button
           size="large"
           className="value-field__step"
           onClick={() => nudge(-1)}
-          disabled={value <= min}
+          disabled={disabled || value <= min}
           aria-label={`${meta.label} verringern`}
         >
           −
         </Button>
 
         <Slider
-          id="value-field-slider"
+          id={id}
           className="value-field__track"
           min={min}
           max={max}
           step={meta.step}
           value={value}
           onChange={onChange}
+          disabled={disabled}
           // The readout already names the value, permanently and in a size that can be read at
           // arm's length. A tooltip would repeat it, smaller, under a fingertip.
           tooltip={{ open: false }}
@@ -78,17 +104,19 @@ export function ValueField({ amount: meta, value, onChange }: ValueFieldProps) {
           size="large"
           className="value-field__step"
           onClick={() => nudge(1)}
-          disabled={value >= max}
+          disabled={disabled || value >= max}
           aria-label={`${meta.label} erhöhen`}
         >
           +
         </Button>
       </div>
 
-      <div className="value-field__bounds" aria-hidden="true">
-        <span>{formatNumber(min, meta.decimals)}</span>
-        <span>{formatNumber(max, meta.decimals)}</span>
-      </div>
+      {!compact && (
+        <div className="value-field__bounds" aria-hidden="true">
+          <span>{formatNumber(min, meta.decimals)}</span>
+          <span>{formatNumber(max, meta.decimals)}</span>
+        </div>
+      )}
     </div>
   )
 }

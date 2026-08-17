@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Creating a vital measurement through the "+" flow.
+ * Creating a vital measurement through a lane's own „Erfassen“ button.
  *
  * Like the correction tests, the assertions run through to what local storage holds. A point
  * appearing on the chart is not evidence that anything was recorded, and a test that stopped at
@@ -25,11 +25,12 @@ async function storedVitals(page: Page, kind: string) {
   )
 }
 
-/** Opens the sheet and picks a metric, leaving the value step on screen. */
-async function openEntry(page: Page, metric: RegExp) {
-  await page.getByRole('button', { name: /Erfassen/ }).click()
-  await page.getByRole('button', { name: 'Wert Vitalparameter' }).click()
-  await page.getByRole('button', { name: metric }).click()
+/**
+ * Opens a lane's sheet, which lands on the value step directly: the button that was pressed is
+ * what named the metric, so there is no picker in between.
+ */
+async function openEntry(page: Page, lane: string) {
+  await page.getByRole('button', { name: `${lane} erfassen` }).click()
 }
 
 /**
@@ -52,7 +53,7 @@ test('records a new value with the steppers and saves it', async ({ page }) => {
   const before = await storedVitals(page, 'temperature')
   expect(before).toHaveLength(5)
 
-  await openEntry(page, /^Temp/)
+  await openEntry(page, 'Temperatur')
 
   // The control opens on the last reading for the metric, which is what makes most entries a
   // couple of taps rather than a hunt across the range.
@@ -76,7 +77,7 @@ test('records a new value with the steppers and saves it', async ({ page }) => {
 })
 
 test('the new value is drawn on the timeline and survives a reload', async ({ page }) => {
-  await openEntry(page, /^SpO₂/)
+  await openEntry(page, 'Sauerstoffsättigung')
   await page.getByRole('button', { name: 'Sauerstoffsättigung verringern' }).click()
   await commit(page)
 
@@ -95,7 +96,7 @@ test('the new value is drawn on the timeline and survives a reload', async ({ pa
 })
 
 test('the timestamp defaults into the case and is adjustable', async ({ page }) => {
-  await openEntry(page, /^HF/)
+  await openEntry(page, 'Herzfrequenz')
 
   // The demo case is pinned to a fixed date, so "now" is resolved against the case rather than
   // the wall clock: the entry must land in the record, not days after it. Scoped to the sheet's
@@ -116,7 +117,7 @@ test('the timestamp defaults into the case and is adjustable', async ({ page }) 
 test('a value can be entered and then corrected on the chart', async ({ page }) => {
   // The two halves of the brief's core interaction meeting: entry through the sheet, correction
   // by pointer, on the same entry.
-  await openEntry(page, /^Temp/)
+  await openEntry(page, 'Temperatur')
   await commit(page)
 
   const created = (await storedVitals(page, 'temperature')).at(-1)
@@ -137,13 +138,126 @@ test('a value can be entered and then corrected on the chart', async ({ page }) 
   expect(corrected.revisions).toHaveLength(1)
 })
 
+/**
+ * Blood pressure is the one entry that is more than one number, because a cuff inflates once and
+ * reports three. The assertion that matters is the shared timestamp: that is what makes them one
+ * reading rather than three that happen to land near each other.
+ */
+test('records all three pressures as one reading on one timestamp', async ({ page }) => {
+  const before = {
+    systolic: await storedVitals(page, 'bloodPressureSystolic'),
+    mean: await storedVitals(page, 'bloodPressureMean'),
+    diastolic: await storedVitals(page, 'bloodPressureDiastolic'),
+  }
+
+  await openEntry(page, 'Blutdruck')
+
+  // Written the way a monitor writes it, and the way it is read aloud.
+  await expect(page.locator('.pressure__notation')).toHaveText('133/80 (98)')
+
+  await page.getByRole('button', { name: 'Blutdruck systolisch erhöhen' }).click()
+  await expect(page.locator('.pressure__notation')).toHaveText('134/80 (98)')
+
+  await commit(page)
+
+  const after = {
+    systolic: await storedVitals(page, 'bloodPressureSystolic'),
+    mean: await storedVitals(page, 'bloodPressureMean'),
+    diastolic: await storedVitals(page, 'bloodPressureDiastolic'),
+  }
+
+  expect(after.systolic).toHaveLength(before.systolic.length + 1)
+  expect(after.mean).toHaveLength(before.mean.length + 1)
+  expect(after.diastolic).toHaveLength(before.diastolic.length + 1)
+
+  expect(after.systolic.at(-1).value).toBe(134)
+  const at = after.systolic.at(-1).at
+  expect(after.mean.at(-1).at).toBe(at)
+  expect(after.diastolic.at(-1).at).toBe(at)
+})
+
+/** A manual cuff gives a systolic and a diastolic and no mean at all. */
+test('a pressure switched off is not written', async ({ page }) => {
+  const before = {
+    systolic: (await storedVitals(page, 'bloodPressureSystolic')).length,
+    mean: (await storedVitals(page, 'bloodPressureMean')).length,
+  }
+
+  await openEntry(page, 'Blutdruck')
+  await page.getByRole('checkbox', { name: 'Mittlerer arterieller Druck gemessen' }).click()
+  await expect(page.locator('.pressure__notation')).toHaveText('133/80 (–)')
+
+  await commit(page)
+
+  expect(await storedVitals(page, 'bloodPressureMean')).toHaveLength(before.mean)
+  expect(await storedVitals(page, 'bloodPressureSystolic')).toHaveLength(before.systolic + 1)
+})
+
+/**
+ * The first reading of a case has nothing to copy, so it opens on the pre-operative values in the
+ * header — a real measurement of this patient. There is no pre-operative mean, and rather than
+ * proposing the middle of the axis for it the sheet opens that one switched off.
+ */
+test('the first reading opens on the pre-operative values, with no mean invented', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const key = 'anesthesia-record:case'
+    const envelope = JSON.parse(window.localStorage.getItem(key)!)
+    envelope.case.entries = []
+    window.localStorage.setItem(key, JSON.stringify(envelope))
+  })
+  await page.reload()
+
+  await openEntry(page, 'Blutdruck')
+
+  await expect(page.locator('.pressure__notation')).toHaveText('142/85 (–)')
+  await expect(
+    page.getByRole('checkbox', { name: 'Mittlerer arterieller Druck gemessen' }),
+  ).not.toBeChecked()
+})
+
+/** All three switched off is not a measurement, and the sheet says so by refusing to save. */
+test('a reading with nothing measured cannot be saved', async ({ page }) => {
+  await openEntry(page, 'Blutdruck')
+
+  for (const name of [
+    'Blutdruck systolisch gemessen',
+    'Mittlerer arterieller Druck gemessen',
+    'Blutdruck diastolisch gemessen',
+  ]) {
+    await page.getByRole('checkbox', { name }).click()
+  }
+
+  await expect(page.getByRole('button', { name: 'Übernehmen' })).toBeDisabled()
+})
+
+/** One cuff inflation is one act, so taking it back is one undo rather than three. */
+test('undo takes back the whole reading', async ({ page }) => {
+  const counts = async () => ({
+    systolic: (await storedVitals(page, 'bloodPressureSystolic')).length,
+    mean: (await storedVitals(page, 'bloodPressureMean')).length,
+    diastolic: (await storedVitals(page, 'bloodPressureDiastolic')).length,
+  })
+  const before = await counts()
+
+  await openEntry(page, 'Blutdruck')
+  await commit(page)
+  expect((await counts()).systolic).toBe(before.systolic + 1)
+
+  await page.getByRole('button', { name: 'Rückgängig' }).click()
+
+  expect(await counts()).toEqual(before)
+})
+
 test('leaving the sheet records nothing', async ({ page }) => {
   const before = await storedVitals(page, 'temperature')
 
-  await openEntry(page, /^Temp/)
+  await openEntry(page, 'Temperatur')
   await page.getByRole('button', { name: 'Temperatur erhöhen' }).click()
-  await page.getByRole('button', { name: 'Zurück' }).click()
-  await page.keyboard.press('Escape')
+  // A lane's sheet has no step behind it to go back to, so the way out is out.
+  await page.getByRole('button', { name: 'Abbrechen' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
 
   expect(await storedVitals(page, 'temperature')).toHaveLength(before.length)
 })

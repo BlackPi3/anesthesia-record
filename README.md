@@ -26,8 +26,10 @@ Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprot
 
 Everything the record holds can be written, corrected and removed, and the case survives a reload.
 
-- **Recording** runs through one "+" flow for all three kinds of entry: a value, a medication or
-  fluid, a phase event. Kind first, then a picker, then the form.
+- **Recording** starts on the row being written into: every lane and both bands carry their own
+  „Erfassen“ button. A single-metric lane opens straight on its value control; the blood pressure
+  lane opens one reading holding all three pressures; the medication and event bands still ask
+  which drug or which milestone first.
 - **Vitals** are drawn as one lane per parameter over a shared time axis. A point is corrected by
   dragging it, by arrow keys once selected, or by opening it in the entry sheet from its readout.
   On a touchscreen a swipe scrolls the record and a press and hold is what moves a value.
@@ -90,16 +92,18 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
 
 - **One shared timeline** for vitals, medications/fluids, and events — not separate timelines per
   category — so correlations between them (e.g. a vital change right after a dose) stay readable.
-- **Entry flow**: a prominent "+" button opens a picker — select which metric, then dial in the
-  value via a scrollable/rotatable control (touch swipe, mouse drag, or scroll wheel, with
-  keyboard as a desktop alternative). The entry timestamps to the current time by default: this
-  reflects how documentation actually happens in the OR (logged as it happens), rather than the
-  user placing a point at an arbitrary spot on the chart.
+- **Entry flow**: each row of the chart carries its own entry button, so what is being written down
+  is chosen by pointing at the row rather than by naming it in a list. The value is then dialled in
+  on a coarse-and-fine control (slider plus steppers, with keyboard as a desktop alternative). The
+  entry timestamps to the current time by default: this reflects how documentation actually happens
+  in the OR (logged as it happens), rather than the user placing a point at an arbitrary spot on
+  the chart.
 - **Correction**: tapping an existing point on the timeline reopens it for editing (value and/or
   time), building on the same control used for entry.
-- **NiBP (blood pressure)** is entered as three separate single-value entries (systolic, mean,
-  diastolic) sharing one timestamp, rather than a combined multi-value widget — kept deliberately
-  simple. How these three render together on the timeline is a rendering decision, still open.
+- **NiBP (blood pressure)** is entered as one reading holding all three pressures on one shared
+  timestamp, because a cuff inflates once and reports all three. Each of the three can be switched
+  off for a manual cuff, which gives no mean. They are still *stored* as three ordinary vital
+  entries, so correcting one afterwards touches only that one.
 - **5-minute gridlines** on the timeline are a visual/clinical reference (matching how vitals are
   conventionally charted), not a constraint — entries can land at any exact time.
 - **Local persistence only**, no backend — a mandatory constraint from the challenge brief, and
@@ -151,10 +155,10 @@ paper protocol.
 
 ## Entering a value
 
-`src/entry/` holds the creation flow. A floating "+ Wert erfassen" button opens a sheet in two
-steps: the six metrics as a grid of large tiles, then the value control for the one chosen. Each
-tile carries the colour of the lane the point will be drawn in, as an edge rather than a fill, so
-the choice made here and the mark that appears on the chart are visibly the same thing.
+`src/entry/` holds the creation flow. Each row of the chart carries its own „Erfassen“ button, and
+that button is what says which entry is being made: a single-metric lane opens straight on the
+value control, with no picker in between. `src/entry/target.ts` is the whole of that mapping — what
+a lane's button opens, and which two still need a list first.
 
 The value control is a large readout above `−` / track / `+`. The buttons move by the metric's
 step, the track spans its whole input range for coarse movement, and the readout names the exact
@@ -165,7 +169,14 @@ spelled out the whole time is what makes either interaction exact. `clamp` and `
 shared with the timeline's scale maths, so a value entered and a value dragged round identically.
 
 The value opens on the last reading for that metric rather than the middle of the scale. Vitals
-move gradually, so the previous value is usually a step or two from the new one.
+move gradually, so the previous value is usually a step or two from the new one. Where the case
+holds no reading yet, it falls back to the pre-operative value in the header for the metrics that
+have one.
+
+Blood pressure gets its own form (`src/entry/BloodPressureForm.tsx`): all three pressures on one
+sheet under one timestamp, with the reading spelled out at the top in the notation a monitor uses
+— `120/70 (85)`. Each pressure has a `gemessen` checkbox, because a manual cuff gives no mean, and
+only the ones left on are written.
 
 The timestamp defaults to now and is adjustable in whole minutes, which is the resolution a
 protocol is read at; anything finer is available afterwards by dragging the point along the time
@@ -173,8 +184,10 @@ axis. "Now" is resolved against the case rather than the wall clock — the demo
 fixed date for reproducibility, and once that date is past, the wall clock is not a time in the
 case (`caseNow` in `src/domain/entries.ts`).
 
-Blood pressure stays three separate entries, each its own trip through the flow, per the data
-model decision above.
+Blood pressure is entered once and stored three times, per the decision above. Where the case holds
+nothing to copy, the first reading opens on the patient's pre-operative values from the header, and
+the mean — which has no pre-operative counterpart — opens switched off rather than on a number the
+app made up.
 
 ## Setup
 
