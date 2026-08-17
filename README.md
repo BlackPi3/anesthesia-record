@@ -213,7 +213,9 @@ npm run videos    # re-records the user-story videos in docs/videos/
 ```
 
 Playwright runs three projects: desktop Chrome, an iPad-sized viewport with touch, and the same
-iPad viewport under WebKit, the engine Safari uses. Video is recorded for every run.
+iPad viewport under WebKit, the engine Safari uses. Video is recorded for the four user stories and
+for any test that fails. `npm run videos` is the only command that rewrites the committed
+recordings in `docs/videos/`, so running the suite never leaves them modified in the working tree.
 
 The touch tests (`tests/touch.spec.ts`) drive real gestures through the Chrome DevTools Protocol
 and run on Chromium only. Synthetic touch events do not cause real scrolling, so no cross-browser

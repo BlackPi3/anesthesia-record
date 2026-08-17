@@ -18,8 +18,11 @@ const baseURL = `http://localhost:${PORT}`
  * a page that scrolls from one that does not. What those tests prove about the gesture is proven
  * once, in Chromium, and the WebKit project covers everything else.
  *
- * Videos are kept for every run: the brief asks for short recordings of the main user stories as
- * a deliverable, so they are output, not just retained on failure.
+ * Video is recorded where it is watched. The brief asks for short recordings of the main user
+ * stories as a deliverable, so `stories.spec.ts` turns it on for itself; everywhere else a passing
+ * test's video is a file nobody opens, and there were two hundred of them per run. What is left is
+ * the four stories and anything that fails, failure being the only other moment a recording earns
+ * the disk it is written to.
  */
 export default defineConfig({
   testDir: './tests',
@@ -32,7 +35,7 @@ export default defineConfig({
   use: {
     baseURL,
     trace: 'on-first-retry',
-    video: 'on',
+    video: 'retain-on-failure',
     // Fixes the demo case's timestamps so screenshots and assertions do not depend on the
     // machine's timezone.
     timezoneId: 'Europe/Berlin',

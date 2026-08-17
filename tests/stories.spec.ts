@@ -3,10 +3,9 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test'
 /**
  * The main user stories, recorded.
  *
- * Every test in this suite produces a video anyway — `video: 'on'` — but 120 files named after
- * assertions do not tell anyone which flows matter. These four do, and they are written to be
- * watched: whole tasks from the first tap to the saved record, at a pace a person can follow,
- * rather than the shortest path to an assertion.
+ * The suite as a whole records nothing but its failures. These four record because they are the
+ * ones anybody will watch, and they are written to be watched: whole tasks from the first tap to
+ * the saved record, at a pace a person can follow, rather than the shortest path to an assertion.
  *
  * They still assert. A recording of a flow that quietly stopped working is worse than no recording,
  * so each story ends by checking what reached local storage.
@@ -54,8 +53,18 @@ async function centreOf(page: Page, id: string) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
+/** The suite records only failures; these four are the ones recorded because they are watched. */
+test.use({ video: 'on' })
+
 /**
  * Keeps the finished recording under a name that says what it shows.
+ *
+ * Only when `npm run videos` asked for it. The files in `docs/videos/` are a committed deliverable,
+ * and a webm re-encodes to different bytes every time, so a plain `npm run e2e` used to leave seven
+ * modified binaries in the working tree and invite them into whatever commit came next — which is
+ * how a README-only commit ended up carrying four videos. Re-recording is now something you ask
+ * for, and the ask is the script name: npm puts it in `npm_lifecycle_event`, so this needs no
+ * environment variable of its own and behaves the same on every platform.
  *
  * The page is closed first: a video is finalised when its page is, and `saveAs` on a page still
  * being recorded would copy a file the browser has not finished writing.
@@ -63,6 +72,7 @@ async function centreOf(page: Page, id: string) {
 async function keepVideo(page: Page, info: TestInfo, name: string) {
   const video = page.video()
   if (!video) return
+  if (process.env.npm_lifecycle_event !== 'videos') return
 
   await page.close()
   await video.saveAs(`docs/videos/${name}.${info.project.name}.webm`)
