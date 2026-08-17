@@ -311,6 +311,56 @@ must not do.
 
 ---
 
+## 2026-08-17 — A controlled component may keep state, if it is not the value
+
+The rule so far has been that the entry field keeps nothing: the parent owns the number and the
+field renders what it is given, which is what lets one control serve entry and correction without
+two copies drifting apart. The keypad appears to break it — `ValueField` now has a `useState`.
+
+It does not, because what it keeps is not the value. `36,` is a legal thing to have typed and is not
+a number; `97` on the way to `975` is a different thing from the number 97; and after deleting every
+digit there is nothing at all to render, though the draft still has to hold something. So the field
+keeps the **digits as a string** and the parent keeps the **number they parse to**, and every
+keypress reports the parsed number upward. `null` means nothing has been typed yet and the readout
+is showing the parent's value — which is exactly what makes the first digit replace the opening
+number rather than append to it.
+
+**The test for whether local state is legitimate in a controlled component: could the parent
+reconstruct it?** From the number 36 you cannot tell whether the user typed `36` or `36,`. That is
+state the parent cannot hold, so it belongs to the field. The moment it *is* derivable — the value,
+the formatted text, whether the number is in range — it goes back to being computed, not stored.
+
+The same reasoning put the typing rules in `digits.ts` rather than in the component: they are string
+and number work with no rendering in them, so they are tested the way the timeline's coordinate
+maths is, with inputs and expected outputs rather than through a rendered sheet.
+
+---
+
+## 2026-08-17 — `autoFocus` is not a general HTML attribute in practice
+
+The sheet was supposed to focus its readout on open so a desktop user types straight into it.
+`autoFocus` was set on the readout `<div role="spinbutton" tabIndex={0}>`, the tests passed, and the
+feature did not work — the first digit typed went nowhere, and the failure was invisible because the
+value simply stayed where it was.
+
+`document.activeElement` was the trigger button, in both sheets. React only performs the focus for
+form controls, and the HTML `autofocus` attribute is processed once per document, so an element
+inserted later is generally ignored. **A prop that is silently a no-op on the element you put it on
+is worse than one that errors**, and only measuring where focus actually went revealed it.
+
+The fix is a `useEffect` with a ref, which is honest about what it is: focusing is a DOM side effect,
+not a description of the rendered output. It also has to be arranged with whatever else claims
+focus — AntD's `Drawer` focuses its own panel on open, so the sheets now pass `autoFocus={false}`
+where a field will take it, and keep it where there is nothing to hand it to (the picker step, and a
+milestone, which has no value to type). Otherwise the drawer would win the race and `Escape` would
+have nothing to close.
+
+**The general lesson is the checking, not the fact.** Two tests were green over a broken feature,
+because they exercised the keypad buttons rather than the keyboard. The assertion that caught it was
+a direct one: read `document.activeElement` and see what it says.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional
