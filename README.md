@@ -27,9 +27,13 @@ Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprot
 Everything the record holds can be written, corrected and removed, and the case survives a reload.
 
 - **Recording** starts on the row being written into: every lane and both bands carry their own
-  „Erfassen“ button. A single-metric lane opens straight on its value control; the blood pressure
+  „Erfassen“ button. A single-metric lane opens straight on its value field; the blood pressure
   lane opens one reading holding all three pressures; the medication and event bands still ask
   which drug or which milestone first.
+- **Values are typed**, on a keypad in the sheet — the number is already known from the monitor, so
+  the shortest path to the record is its digits. A physical keyboard types into the same field, and
+  `−` / `+` move an entered value by one step. The blood pressure sheet has one keypad and three
+  rows, and tapping a row points the keypad at it.
 - **Vitals** are drawn as one lane per parameter over a shared time axis. A point is corrected by
   dragging it, by arrow keys once selected, or by opening it in the entry sheet from its readout.
   On a touchscreen a swipe scrolls the record and a press and hold is what moves a value.
@@ -46,8 +50,9 @@ Everything the record holds can be written, corrected and removed, and the case 
 The domain layer holds the case and entry types, the vital/event catalogue with its German labels
 and ranges, the local-storage persistence layer, and a fictional demo case.
 
-65 unit tests cover the domain layer and the timeline's coordinate and label-placement maths. 144
-Playwright tests run across desktop Chrome, an iPad-sized viewport with touch, and WebKit.
+89 unit tests cover the domain layer, the keypad's typing rules, and the timeline's coordinate and
+label-placement maths. 71 Playwright tests run across desktop Chrome, an iPad-sized viewport with
+touch, and WebKit — 208 runs in all.
 
 This README grows alongside the build; sections appear as the thing they describe does.
 
@@ -93,11 +98,11 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
 - **One shared timeline** for vitals, medications/fluids, and events — not separate timelines per
   category — so correlations between them (e.g. a vital change right after a dose) stay readable.
 - **Entry flow**: each row of the chart carries its own entry button, so what is being written down
-  is chosen by pointing at the row rather than by naming it in a list. The value is then dialled in
-  on a coarse-and-fine control (slider plus steppers, with keyboard as a desktop alternative). The
-  entry timestamps to the current time by default: this reflects how documentation actually happens
-  in the OR (logged as it happens), rather than the user placing a point at an arbitrary spot on
-  the chart.
+  is chosen by pointing at the row rather than by naming it in a list. The value is then typed on a
+  keypad — the number is read off a monitor, so digits are both the fastest and the only exact way
+  to say it. The entry timestamps to the current time by default: this reflects how documentation
+  actually happens in the OR (logged as it happens), rather than the user placing a point at an
+  arbitrary spot on the chart.
 - **Correction**: tapping an existing point on the timeline reopens it for editing (value and/or
   time), building on the same control used for entry.
 - **NiBP (blood pressure)** is entered as one reading holding all three pressures on one shared
@@ -113,9 +118,10 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
   advantages (server rendering, API routes) solve problems this backend-less app doesn't have, so
   React Router keeps the whole app as plain client-side React.
 
-**Open, not yet decided:** the value-selection control itself (a scroll/rotate "wheel" vs. a
-plain tappable list of values), the desktop/mouse input mapping in detail, and a precision
-fallback for landing exact numbers.
+- **Values are typed, not dialled.** A keypad in the sheet, not a slider or a wheel: the number is
+  already known when the sheet opens, and a gesture can only approximate it — a pixel is worth more
+  than one unit on most of these axes. Typing is exact by construction, and it is the same
+  interaction on an iPad and on a desktop keyboard.
 
 ## Timeline
 
@@ -162,26 +168,35 @@ paper protocol.
 
 `src/entry/` holds the creation flow. Each row of the chart carries its own „Erfassen“ button, and
 that button is what says which entry is being made: a single-metric lane opens straight on the
-value control, with no picker in between. `src/entry/target.ts` is the whole of that mapping — what
+value field, with no picker in between. `src/entry/target.ts` is the whole of that mapping — what
 a lane's button opens, and which two still need a list first.
 
-The value control is a large readout above `−` / track / `+`. The buttons move by the metric's
-step, the track spans its whole input range for coarse movement, and the readout names the exact
-value throughout. That pairing is deliberate and comes from the drag correction: a pixel is worth
-more than one unit on most of these axes, so a continuous gesture cannot promise a specific
-number on its own. Something coarse to get close, something discrete to land, and the number
-spelled out the whole time is what makes either interaction exact. `clamp` and `snapToStep` are
-shared with the timeline's scale maths, so a value entered and a value dragged round identically.
+The value field is a large readout above a keypad. The number is typed: whoever is filling this in
+is reading 133 off a monitor and already knows the value, so the shortest path from what they know
+to what the record holds is three digits — and typing is exact by construction, which no gesture on
+these axes is. The keypad is in the sheet rather than the system's, because the sheet is a drawer at
+the bottom of the screen, which is exactly where an iPad's keyboard opens: a focused text input
+would cover the form it belongs to. On a desktop the sheet hands its focus to the readout, so the
+number is typed the moment the sheet appears; `−` and `+` (and the arrow keys) move an entered value
+by the metric's step, which is what most corrections need.
 
-The value opens on the last reading for that metric rather than the middle of the scale. Vitals
-move gradually, so the previous value is usually a step or two from the new one. Where the case
-holds no reading yet, it falls back to the pre-operative value in the header for the metrics that
-have one.
+The typing rules live in [`src/entry/digits.ts`](src/entry/digits.ts) as plain functions, tested
+with strings and numbers: the first digit replaces the value the sheet opened on, a digit that would
+carry the value past the metric's maximum never lands, and a number below its minimum — which
+includes the zero left by deleting every digit — reaches the draft and is refused by `isComplete`,
+because a value on its way to 45 is 4 first and typing cannot be stopped at the bottom of a range.
+
+The field opens on the last reading for that metric rather than on nothing. Vitals move gradually,
+so the previous value is often within a step of the new one and the entry is a tap on `+`; where it
+is not, the first digit typed replaces it whole. Where the case holds no reading yet, it falls back
+to the pre-operative value in the header for the metrics that have one.
 
 Blood pressure gets its own form (`src/entry/BloodPressureForm.tsx`): all three pressures on one
 sheet under one timestamp, with the reading spelled out at the top in the notation a monitor uses
 — `120/70 (85)`. Each pressure has a `gemessen` checkbox, because a manual cuff gives no mean, and
-only the ones left on are written.
+only the ones left on are written. There is one keypad for the three, because the three are typed
+one after another and never at once: tapping a number points the keypad at it, and typing into a
+row that was switched off switches it back on.
 
 The timestamp defaults to now and is adjustable in whole minutes, which is the resolution a
 protocol is read at; anything finer is available afterwards by dragging the point along the time

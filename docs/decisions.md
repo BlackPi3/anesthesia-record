@@ -245,6 +245,10 @@ merged view added later needs to be reachable in one action from the entry layou
 
 ## 2026-08-16 — Value control: large readout, stepper buttons, coarse track
 
+> **Superseded on 2026-08-17** — the track is gone and values are typed on a keypad. The reasoning
+> below is kept because the part of it that held up is what the keypad inherited: the readout, the
+> steppers, and shared rounding with the chart. See the entry at the end of this log.
+
 **What:** The value step of the entry flow is a large numeric readout above a row of
 `−` / track / `+`. The buttons move by the metric's `step` from `catalog.ts`; the track covers its
 whole `inputRange` for coarse movement. The readout names the exact value at all times.
@@ -630,6 +634,54 @@ on the reader learning the convention, and degrades to the old scatter as soon a
 crowded). One box in `120/70 (85)` notation on a single line (the notation the sheet uses, but
 about 100px wide against roughly 86px between readings on the demo case — it would not fit, and the
 vertical stack maps to the markers better anyway).
+
+---
+
+## 2026-08-17 — Values are typed on a keypad, not dialled on a track
+
+**What:** The coarse track is gone. The value step is now a large readout above a keypad: ten
+digits, a decimal comma where the metric has decimals, a backspace, and the `−` / `+` keys the old
+control already had. A physical keyboard types into the same field, and the sheet hands its focus to
+it on open so a desktop entry needs no click first. Supersedes the 2026-08-16 entry above.
+
+**Why:** The premise of the track was that the value has to be *found*. It does not. Whoever is
+filling this in is reading 133 off a monitor and already knows the number, so the shortest path from
+what they know to what the record holds is its digits — and the track was the slowest and least
+exact half of the old control, a guess that then had to be corrected with the steppers. Typing is
+exact by construction, needs no readout to disambiguate it, and is the same interaction on an iPad
+and on a desktop keyboard. It also removes the one place in the app where accuracy depended on
+pointer precision at entry time.
+
+**Why an in-app keypad and not a text input:** the sheet is a drawer at the bottom of the screen,
+which is exactly where an iPad's system keyboard opens. A focused input would put the keyboard over
+the form it belongs to and reflow the sheet under a thumb already moving. The keypad is always in
+the same place, at the touch scale the rest of the app uses, and a physical keyboard still types
+into the field on a desktop — so both platforms get the fast path, neither at the other's expense.
+
+**Why the `−` / `+` keys stay:** typing is how a value is entered; a step is how a value already
+entered is moved by one, which is the shape of most corrections. Retyping 97 as 98 is four presses;
+stepping it is one.
+
+**What the bounds now mean:** a digit that would carry the value past the metric's maximum is
+ignored, which catches the one typo a keypad makes easy — a digit too many. The minimum cannot be
+enforced while typing, because 45 is 4 first, so it is enforced in `isComplete`: the value reaches
+the draft, the range under the readout turns red, and „Übernehmen“ stays shut. That also covers the
+zero left behind by deleting every digit. `snapToStep` is no longer applied to an entered value
+either — a typed 12 µg is a real dose and must not be dragged onto a grid of fives — but for every
+vital the step *is* one decimal place, so a typed value and a dragged one still round identically.
+
+**Blood pressure:** one keypad, three rows. Three keypads do not fit on an iPad and would be
+answering a question the sheet never asks — the three numbers are typed one after another, never at
+once. Tapping a row's number points the keypad at it, and typing into a row that was switched off
+switches it back on, since a number typed into a row is the clearest statement there is that it was
+measured.
+
+**Rejected:** a system text input per value (covers the sheet on the iPad, and three of them on the
+blood pressure form invite a mid-entry keyboard dismissal). Keeping the track alongside the keypad
+(two ways to set one number, the slower one taking the most room, and the sheet is already at the
+height of a laptop window). Auto-placing the decimal point monitor-style, so `365` means 36,5
+(fewer presses on the one metric with decimals, but it silently reinterprets digits, which is the
+one thing a record must never do).
 
 ---
 

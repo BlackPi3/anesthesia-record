@@ -51,6 +51,10 @@ export function EditEntry({ record, entry, onCorrect, onRemove, onClose }: EditE
       height="auto"
       title={draftTitle(draft)}
       className="entry-sheet"
+      // The value field takes the focus instead, so a correction can be typed on arrival. A
+      // milestone is the one entry with no value to type, so that sheet keeps the drawer's own
+      // focus — something inside has to hold it, or Escape has nothing to close.
+      autoFocus={draft.type === 'event'}
       footer={
         <div className="entry-sheet__footer">
           {/* Removal sits apart from the other two, on the side a thumb reaches last. It is the

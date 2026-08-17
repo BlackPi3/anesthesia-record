@@ -12,11 +12,19 @@
  * the missing mean would be the app inventing a clinical value, and requiring it would mean typing
  * a number nobody measured. `nicht gemessen` is the honest third option.
  *
+ * There is one keypad, not three. Three keypads do not fit on an iPad, and they would be answering
+ * a question the sheet never asks: the three numbers are typed one after another, never at once.
+ * So the rows are the selection — tapping a number says "this is the one I am typing" — and the
+ * keypad writes into whichever is selected. It is the same shape as the monitor being copied from,
+ * where one reading is read off in one order, and it means the whole entry is `1` `3` `3`, tap,
+ * `8` `0`, tap, `9` `8`.
+ *
  * Correcting stays one value at a time, on the chart or in the editing sheet, which is what the
  * other reason for splitting them up actually needs: noticing afterwards that one of the three was
  * an artefact and fixing exactly that one.
  */
 
+import { useEffect, useRef, useState } from 'react'
 import { Checkbox } from 'antd'
 
 import { BLOOD_PRESSURE_KINDS, VITALS, vitalAmount } from '../domain/catalog'
@@ -24,7 +32,16 @@ import { caseNow } from '../domain/entries'
 import type { AnesthesiaCase } from '../domain/types'
 import { formatValue } from '../format'
 import { TimeField } from './EntryForm'
-import { ValueField } from './ValueField'
+import { Keypad } from './Keypad'
+import {
+  digitsText,
+  digitsValue,
+  handleKey,
+  nudge,
+  pressKey,
+  type Digits,
+  type Key,
+} from './digits'
 import type { BloodPressureDraft, BloodPressureKind } from './draft'
 
 export interface BloodPressureFormProps {
@@ -34,19 +51,64 @@ export interface BloodPressureFormProps {
 }
 
 export function BloodPressureForm({ record, draft, onChange }: BloodPressureFormProps) {
-  function setReading(kind: BloodPressureKind, next: Partial<BloodPressureDraft['readings'][BloodPressureKind]>) {
+  // The pressure the keypad is typing into. Systolic first, because that is the number a reading
+  // is read out from and the one every cuff reports.
+  const [selected, setSelected] = useState<BloodPressureKind>('bloodPressureSystolic')
+  const [digits, setDigits] = useState<Digits>(null)
+  const first = useRef<HTMLButtonElement>(null)
+
+  const meta = vitalAmount(selected)
+  const value = draft.readings[selected].value
+
+  // The row the keypad opens on takes the focus, so a desktop keyboard types into this sheet the
+  // same way it types into a single-value one. Every later row is focused by the tap that selects
+  // it. See the same effect in `ValueField` for why it is not the `autoFocus` attribute.
+  useEffect(() => {
+    first.current?.focus()
+  }, [])
+
+  function setReading(
+    kind: BloodPressureKind,
+    next: Partial<BloodPressureDraft['readings'][BloodPressureKind]>,
+  ) {
     onChange({
       ...draft,
       readings: { ...draft.readings, [kind]: { ...draft.readings[kind], ...next } },
     })
   }
 
+  /** Moving the keypad to another number abandons whatever was half-typed into this one. */
+  function select(kind: BloodPressureKind) {
+    setSelected(kind)
+    setDigits(null)
+  }
+
+  /**
+   * A number typed into a row is the clearest statement there is that it was measured, so entering
+   * one switches the row back on. Switching a row off keeps its value and is still one tap; this
+   * only means the checkbox is not a second thing to remember after typing.
+   */
+  function write(next: number) {
+    setReading(selected, { value: next, measured: true })
+  }
+
+  function press(key: Key) {
+    const next = pressKey(digits, key, value, meta)
+    setDigits(next)
+    write(digitsValue(next, value, meta))
+  }
+
+  function step(direction: number) {
+    setDigits(null)
+    write(nudge(value, direction, meta))
+  }
+
   return (
     <>
-      <div className="pressure">
+      <div className="pressure" onKeyDown={(event) => handleKey(event, press, step)}>
         {/* The reading in the notation it is written and spoken in, so what the sheet is about to
             store looks like what a monitor shows and what a protocol records. */}
-        <output className="pressure__reading" htmlFor="pressure-bloodPressureSystolic">
+        <output className="pressure__reading">
           <span className="pressure__notation">{notation(draft)}</span>
           <span className="pressure__unit">mmHg</span>
         </output>
@@ -56,10 +118,21 @@ export function BloodPressureForm({ record, draft, onChange }: BloodPressureForm
             key={kind}
             kind={kind}
             reading={draft.readings[kind]}
-            onValue={(value) => setReading(kind, { value })}
+            selected={kind === selected}
+            ref={kind === 'bloodPressureSystolic' ? first : undefined}
+            // Only the selected row can be mid-way through being typed, so it is the only one that
+            // shows digits rather than the number the draft holds.
+            text={kind === selected ? digitsText(digits, value, meta) : null}
+            onSelect={() => select(kind)}
             onMeasured={(measured) => setReading(kind, { measured })}
           />
         ))}
+
+        <p className="pressure__target">
+          Eingabe: <strong>{VITALS[selected].label}</strong>
+        </p>
+
+        <Keypad amount={meta} onKey={press} onStep={step} />
       </div>
 
       {/* One time for all three. It is the whole reason this is one sheet: the shared timestamp is
@@ -95,25 +168,36 @@ function notation(draft: BloodPressureDraft): string {
 }
 
 /**
- * One of the three, as a checkbox that names it, its own value, and the controls to set it.
+ * One of the three: a checkbox that names it and a value that is also the keypad's target.
+ *
+ * The number is the button, because the number is what is being pointed at. Selecting is separate
+ * from measuring — you can point the keypad at a row that is switched off, and typing is what
+ * switches it back on.
  *
  * Switched off, the value stays where it was and only stops being written. Clearing it to zero
- * would mean re-finding the number after a mistaken tap, and zero is a real pressure the control
- * can otherwise reach.
+ * would mean re-finding the number after a mistaken tap, and zero is a real pressure the field can
+ * otherwise reach.
  */
 function PressureRow({
   kind,
   reading,
-  onValue,
+  selected,
+  text,
+  ref,
+  onSelect,
   onMeasured,
 }: {
   kind: BloodPressureKind
   reading: { value: number; measured: boolean }
-  onValue: (value: number) => void
+  selected: boolean
+  /** What the value reads while it is being typed, or `null` to show the stored number. */
+  text: string | null
+  /** Set on the row the sheet opens on, which is the one that takes the focus. */
+  ref?: React.Ref<HTMLButtonElement>
+  onSelect: () => void
   onMeasured: (measured: boolean) => void
 }) {
   const meta = VITALS[kind]
-  const id = `pressure-${kind}`
 
   return (
     <div className={reading.measured ? 'pressure-row' : 'pressure-row pressure-row--off'}>
@@ -127,19 +211,21 @@ function PressureRow({
           <span className="pressure-row__name">{meta.label}</span>
         </Checkbox>
 
-        <output className="pressure-row__value" htmlFor={id}>
-          {reading.measured ? `${formatValue(kind, reading.value)} ${meta.unit}` : 'nicht gemessen'}
-        </output>
+        <button
+          ref={ref}
+          type="button"
+          className="pressure-row__value"
+          aria-pressed={selected}
+          onClick={onSelect}
+        >
+          {/* The visible number needs no repetition of which pressure it is — the checkbox beside
+              it says so — but the button's own name does, since a screen reader reads it alone. */}
+          <span className="visually-hidden">{meta.label}: </span>
+          {reading.measured
+            ? `${text ?? formatValue(kind, reading.value)} ${meta.unit}`
+            : 'nicht gemessen'}
+        </button>
       </div>
-
-      <ValueField
-        compact
-        id={id}
-        amount={vitalAmount(kind)}
-        value={reading.value}
-        disabled={!reading.measured}
-        onChange={onValue}
-      />
     </div>
   )
 }

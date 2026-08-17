@@ -47,6 +47,21 @@ async function storedEntries(page: Page, type: string) {
   )
 }
 
+/**
+ * Types a number on the keypad, one key at a time with a pause between them.
+ *
+ * The pause is the point: this is the interaction the videos exist to show, and a number that
+ * appears in one frame shows nothing about how it got there.
+ */
+async function type(page: Page, digits: string) {
+  for (const digit of digits) {
+    await sheet(page)
+      .getByRole('button', { name: digit === ',' ? 'Komma' : digit, exact: true })
+      .click()
+    await page.waitForTimeout(BEAT / 3)
+  }
+}
+
 async function centreOf(page: Page, id: string) {
   const box = await page.locator(`[data-entry-id="${id}"]`).boundingBox()
   if (!box) throw new Error(`no marker for ${id}`)
@@ -97,10 +112,11 @@ test('story: record a value and correct it on the timeline', async ({ page }, in
   await page.getByRole('button', { name: 'Sauerstoffsättigung erfassen' }).click()
   await page.waitForTimeout(BEAT)
 
-  // The steppers move by the metric's own step, so the number is exact by construction.
-  for (let press = 0; press < 3; press += 1) {
-    await sheet(page).getByRole('button', { name: 'Sauerstoffsättigung verringern' }).click()
-  }
+  // The number is read off the monitor and typed, which is both the fastest way to say it and the
+  // only one that is exact by construction.
+  await type(page, '94')
+  // One step, because a value already entered is corrected by one far more often than retyped.
+  await sheet(page).getByRole('button', { name: 'Sauerstoffsättigung erhöhen' }).click()
   await page.waitForTimeout(BEAT)
   await sheet(page).getByRole('button', { name: 'Übernehmen' }).click()
   await expect(page.getByText(/^Gespeichert /)).toBeVisible()
@@ -141,9 +157,7 @@ test('story: record a bolus', async ({ page }, info) => {
   await sheet(page).getByRole('button', { name: 'Fentanyl' }).click()
   await page.waitForTimeout(BEAT)
 
-  for (let press = 0; press < 4; press += 1) {
-    await sheet(page).getByRole('button', { name: 'Dosis erhöhen' }).click()
-  }
+  await type(page, '50')
   await page.waitForTimeout(BEAT)
   await sheet(page).getByRole('button', { name: 'Übernehmen' }).click()
   await expect(page.getByText(/^Gespeichert /)).toBeVisible()
@@ -171,9 +185,7 @@ test('story: run an infusion, stop it, then undo the stop', async ({ page }, inf
   await sheet(page).getByRole('button', { name: 'NaCl 0,9 %' }).click()
   await page.waitForTimeout(BEAT)
 
-  for (let press = 0; press < 3; press += 1) {
-    await sheet(page).getByRole('button', { name: 'Rate erhöhen' }).click()
-  }
+  await type(page, '250')
   // An infusion documented while it runs has no end time yet, and that is a state the record holds
   // rather than a field left blank.
   await expect(sheet(page).locator('.time-field__clock--running')).toHaveText('läuft')

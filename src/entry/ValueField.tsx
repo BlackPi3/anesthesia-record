@@ -1,30 +1,38 @@
 /**
- * The value step of the entry flow: a large readout, coarse and fine controls beside it.
+ * The value step of the entry flow: a large readout with a keypad under it.
  *
- * The lesson from the drag correction drives the whole shape of this. A pixel is worth more than
- * one unit on most of these axes, so no continuous gesture is precise on its own. What makes a
- * gesture exact is the pairing: something coarse to get close, something discrete to land, and a
- * readout that names the number the whole time. The track is the coarse half, the −/+ buttons are
- * the fine half, and the readout is what turns "about there" into 97 %.
+ * The number is typed. Whoever is filling this in is reading 133 off a monitor and already knows
+ * the value, so the shortest path from what they know to what the record holds is three digits —
+ * not a gesture that approximates it and then has to be corrected. That also makes the control
+ * exact by construction, which a track never was: on most of these axes a pixel is worth more than
+ * one unit.
  *
- * This is a controlled component: it keeps no value of its own, and renders exactly what it is
- * given. The parent owns the number, which is what lets the same control serve entry now and
- * correction later without either of them holding a second, drifting copy.
+ * The readout is still the largest thing in the sheet, and still the only element that promises
+ * what will be stored. It is also where a physical keyboard types, so on a desktop the whole entry
+ * is `1` `3` `3` `Enter`-free — the digits land in the field the sheet opened on.
  *
- * It takes an `AmountMeta` rather than a `VitalKind`, so a dose and an infusion rate get the same
- * control as a saturation. They are the same problem — a number in a range, moved coarsely and
- * then landed exactly — and the reasoning above applies to all three unchanged.
+ * The `−` / `+` keys survive from the old control. Typing is how a value is entered; a step is how
+ * one already entered is moved by one, which is what most corrections are.
  *
- * `clamp` and `snapToStep` come from the timeline's scale maths deliberately, rather than being
- * written again here. A value typed in and a value dragged on the chart must round identically —
- * if they did not, correcting a point could change it without the user asking.
+ * Controlled, and holding only the digits: the parent owns the number. What the field keeps is the
+ * half-typed string, which is not a number — `36,` has to be a legal state on the way to `36,5`.
+ * See `digits.ts`.
  */
 
-import { Button, Slider } from 'antd'
+import { useEffect, useRef, useState } from 'react'
 
 import type { AmountMeta } from '../domain/catalog'
 import { formatNumber } from '../format'
-import { clamp, snapToStep } from '../timeline/scales'
+import { Keypad } from './Keypad'
+import {
+  digitsText,
+  digitsValue,
+  handleKey,
+  nudge,
+  pressKey,
+  type Digits,
+  type Key,
+} from './digits'
 
 export interface ValueFieldProps {
   /** What is being set: its name, unit, range and step. */
@@ -32,91 +40,77 @@ export interface ValueFieldProps {
   value: number
   onChange: (value: number) => void
   /**
-   * The slider's id, which the readout points at. Defaulted because most sheets hold one of these;
-   * a sheet holding several has to name them apart, or every readout would label the first slider.
+   * Whether the readout takes focus on mount, so a desktop user can type straight away. The sheets
+   * hand the drawer's own focus over to it; a picker step keeps it.
    */
-  id?: string
-  /**
-   * Controls only, with the caller printing the number itself.
-   *
-   * A blood pressure sheet holds three of these, and three 56px readouts do not fit on an iPad —
-   * nor should they, because the three numbers are one reading and belong under one heading. The
-   * promise the full control makes still holds at the level of the screen: the number being set is
-   * on it, large, the whole time.
-   */
-  compact?: boolean
-  /** A value that exists but is not going to be written, such as a mean no cuff measured. */
-  disabled?: boolean
+  autoFocus?: boolean
 }
 
-export function ValueField({
-  amount: meta,
-  value,
-  onChange,
-  id = 'value-field-slider',
-  compact = false,
-  disabled = false,
-}: ValueFieldProps) {
-  const { min, max } = meta
+export function ValueField({ amount: meta, value, onChange, autoFocus = true }: ValueFieldProps) {
+  const [digits, setDigits] = useState<Digits>(null)
+  const readout = useRef<HTMLDivElement>(null)
 
-  function nudge(direction: number) {
-    onChange(snapToStep(clamp(value + direction * meta.step, min, max), meta.step))
+  // Focusing on arrival is a DOM side effect, and it is an effect rather than the `autoFocus`
+  // attribute because that attribute does nothing on anything but a form control — and because the
+  // sheet has told its drawer not to take the focus, there is nothing racing this for it.
+  useEffect(() => {
+    if (autoFocus) readout.current?.focus()
+  }, [autoFocus])
+
+  function press(key: Key) {
+    const next = pressKey(digits, key, value, meta)
+    setDigits(next)
+    onChange(digitsValue(next, value, meta))
+  }
+
+  function step(direction: number) {
+    // The digits are given up: the value moves by a step from wherever it is, and what is on
+    // screen afterwards is that number rather than a half-typed one.
+    setDigits(null)
+    onChange(nudge(value, direction, meta))
   }
 
   return (
-    <div className={compact ? 'value-field value-field--compact' : 'value-field'}>
-      {/* `output` is the element for a value the interface computed, and it announces changes to
-          a screen reader without a live region of our own. */}
-      {!compact && (
-        <output className="value-field__readout" htmlFor={id}>
-          <span className="value-field__number">{formatNumber(value, meta.decimals)}</span>
-          <span className="value-field__unit">{meta.unit}</span>
-        </output>
-      )}
-
-      <div className="value-field__controls">
-        <Button
-          size="large"
-          className="value-field__step"
-          onClick={() => nudge(-1)}
-          disabled={disabled || value <= min}
-          aria-label={`${meta.label} verringern`}
-        >
-          −
-        </Button>
-
-        <Slider
-          id={id}
-          className="value-field__track"
-          min={min}
-          max={max}
-          step={meta.step}
-          value={value}
-          onChange={onChange}
-          disabled={disabled}
-          // The readout already names the value, permanently and in a size that can be read at
-          // arm's length. A tooltip would repeat it, smaller, under a fingertip.
-          tooltip={{ open: false }}
-          aria-label={`${meta.label} grob einstellen`}
-        />
-
-        <Button
-          size="large"
-          className="value-field__step"
-          onClick={() => nudge(1)}
-          disabled={disabled || value >= max}
-          aria-label={`${meta.label} erhöhen`}
-        >
-          +
-        </Button>
+    <div className="value-field" onKeyDown={(event) => handleKey(event, press, step)}>
+      {/* A spinbutton rather than a text input: there is a value, a range and a step, and the field
+          takes digits without wanting the system keyboard on top of the sheet. */}
+      <div
+        ref={readout}
+        className="value-field__readout"
+        role="spinbutton"
+        tabIndex={0}
+        aria-label={meta.label}
+        aria-valuenow={value}
+        aria-valuemin={meta.min}
+        aria-valuemax={meta.max}
+        aria-valuetext={`${digitsText(digits, value, meta)} ${meta.unit}`}
+      >
+        <span className="value-field__number">{digitsText(digits, value, meta)}</span>
+        <span className="value-field__unit">{meta.unit}</span>
       </div>
 
-      {!compact && (
-        <div className="value-field__bounds" aria-hidden="true">
-          <span>{formatNumber(min, meta.decimals)}</span>
-          <span>{formatNumber(max, meta.decimals)}</span>
-        </div>
-      )}
+      <Range meta={meta} value={value} />
+
+      <Keypad amount={meta} onKey={press} onStep={step} />
     </div>
   )
 }
+
+/**
+ * The range the metric accepts, which is also why a value can be refused.
+ *
+ * Typing can only be stopped at the top — see `pressKey` — so a number below the minimum reaches
+ * the field and has to be shown as wrong rather than silently corrected. `isComplete` is what
+ * actually holds the sheet shut; this line is what says why.
+ */
+function Range({ meta, value }: { meta: AmountMeta; value: number }) {
+  const out = value < meta.min || value > meta.max
+
+  return (
+    <p className={out ? 'value-field__range value-field__range--out' : 'value-field__range'}>
+      {out && <span className="value-field__range-lead">Zulässig: </span>}
+      {formatNumber(meta.min, meta.decimals)}–{formatNumber(meta.max, meta.decimals)} {meta.unit}
+    </p>
+  )
+}
+

@@ -43,10 +43,6 @@ export const antdTheme: ThemeConfig = {
   components: {
     Button: { controlHeight: 44, fontWeight: 500 },
     Descriptions: { titleMarginBottom: 4 },
-    // The default handle is a 10px dot, which is a mouse target. This is the coarse control in
-    // the entry flow and has to be draggable with a fingertip, so the handle and rail are sized
-    // up to match the rest of the touch scale.
-    Slider: { handleSize: 20, handleSizeHover: 24, railSize: 10, dotSize: 10 },
   },
 }
 

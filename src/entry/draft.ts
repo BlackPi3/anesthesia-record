@@ -142,16 +142,34 @@ export function draftTitle(draft: NewDraft): string {
 /**
  * Whether the draft is complete enough to write.
  *
- * Two things can be missing. An amount left at zero, which is the value the dose and rate controls
+ * Three things can be wrong. An amount left at zero, which is the value the dose and rate fields
  * open on when the case holds nothing to copy — a dose of zero is not a dose, and the alternative,
- * opening on some plausible number, would be inventing a dose the user did not choose. And a blood
- * pressure with all three numbers switched off, which is not a measurement at all.
+ * opening on some plausible number, would be inventing a dose the user did not choose. A blood
+ * pressure with all three numbers switched off, which is not a measurement at all. And a vital
+ * outside the range its metric accepts.
+ *
+ * That last one is where the keypad is caught. Typing can only be stopped at the top — every
+ * multi-digit number passes through smaller ones on the way, so a minimum cannot be applied to a
+ * half-typed number — which leaves a value below the minimum, including the zero left behind by
+ * deleting every digit, reaching the draft. Judging it here rather than in the field is what keeps
+ * the range in one place and out of the components, and it is what lets the sheet refuse a number
+ * instead of quietly correcting one the user typed.
  */
 export function isComplete(draft: NewDraft): boolean {
   if (draft.type === 'bolus') return draft.dose > 0
   if (draft.type === 'infusion') return draft.rate > 0
-  if (draft.type === 'bloodPressure') return measuredPressures(draft).length > 0
+  if (draft.type === 'vital') return inRange(draft.vital, draft.value)
+  if (draft.type === 'bloodPressure') {
+    const measured = measuredPressures(draft)
+    return measured.length > 0 && measured.every((kind) => inRange(kind, draft.readings[kind].value))
+  }
   return true
+}
+
+/** Whether a measured value is one the metric's field is allowed to produce. */
+function inRange(kind: VitalKind, value: number): boolean {
+  const [min, max] = VITALS[kind].inputRange
+  return value >= min && value <= max
 }
 
 /** The kinds of one reading that were actually measured, in the order they are drawn. */

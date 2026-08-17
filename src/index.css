@@ -86,6 +86,16 @@ body {
 
 /* --- Entry -------------------------------------------------------------- */
 
+/*
+ * The sheet grows with its content but never past the window. A keypad, a unit row and two time
+ * controls together can be taller than a laptop window, and a drawer sized to that would put its
+ * own „Übernehmen“ off screen with no way to reach it. Capped, the body scrolls instead.
+ */
+.entry-sheet .ant-drawer-content-wrapper,
+.entry-sheet .ant-drawer-content {
+  max-height: 92vh;
+}
+
 .entry-sheet__body,
 .entry-sheet__footer {
   /* The sheet spans the window, the content does not: a value control stretched across a desktop
@@ -148,12 +158,22 @@ body {
  * The readout is the largest thing in the sheet on purpose. It is the only element that promises
  * the exact number being stored, and it has to be legible at arm's length, from an iPad propped
  * across a workstation, without leaning in.
+ *
+ * It is focusable, because it is also where a physical keyboard types, so it carries a real focus
+ * ring rather than borrowing one from a control it sits above.
  */
 .value-field__readout {
   display: flex;
   align-items: baseline;
   justify-content: center;
   gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.value-field__readout:focus-visible {
+  outline: 2px solid #184f95;
+  outline-offset: 2px;
 }
 
 .value-field__number {
@@ -168,42 +188,60 @@ body {
   color: #52514e;
 }
 
-.value-field__controls {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.value-field__step {
-  min-width: 64px;
-  height: 56px;
-  font-size: 24px;
-  line-height: 1;
-}
-
-/* Three of these share the blood pressure sheet, so the row loses the readout and the margin
-   above the controls — but not the size of the targets. A pressure is stepped one mmHg at a time
-   and the step buttons are what does it. */
-.value-field--compact .value-field__controls {
-  margin-top: 8px;
-  gap: 12px;
-}
-
-.value-field--compact .value-field__step {
-  min-width: 56px;
-  height: 48px;
-  font-size: 20px;
-}
-
-.value-field__bounds {
-  display: flex;
-  justify-content: space-between;
-  margin: 6px 80px 0;
-  font-size: 12px;
+/* What the metric accepts. Quiet while the number is inside it, and the reason the sheet will not
+   save once it is not — a keypad can be typed past the bottom of a range, and the field says so
+   rather than correcting a number nobody asked it to correct. */
+.value-field__range {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 13px;
   color: #898781;
   font-variant-numeric: tabular-nums;
+}
+
+.value-field__range--out {
+  color: #d03b3b;
+  font-weight: 600;
+}
+
+/* --- Keypad ------------------------------------------------------------- */
+
+/*
+ * Ten digits, a comma, a backspace and the two steps, in one block that never moves. Rows are
+ * 56px — the touch scale the rest of the sheet uses — and the grid is four columns wide so the
+ * digits keep the 3 × 3 + 0 shape every keypad has, with the keys that are not digits in a column
+ * of their own on the side a right thumb reaches.
+ */
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 52px;
+  gap: 8px;
+  /* Centred and bounded rather than stretched: across a desktop sheet the keys would otherwise be
+     150px wide, which is not a keypad any hand reads as one. */
+  max-width: 360px;
+  margin: 16px auto 0;
+}
+
+.keypad .ant-btn {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.keypad__key--wide {
+  grid-column: span 2;
+}
+
+.keypad__key--widest {
+  grid-column: span 3;
+}
+
+.keypad__key--tall {
+  grid-row: span 2;
 }
 
 /* --- Blood pressure ----------------------------------------------------- */
@@ -217,6 +255,39 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/*
+ * Wide enough, and the keypad moves beside the three rows instead of under them.
+ *
+ * Stacked, this sheet is taller than a 720px laptop window — the reading, three rows, the keypad,
+ * the time controls and the footer — and the timestamp would sit below the fold on the one entry
+ * where the shared timestamp is the whole point. Side by side it fits, and the rows end up level
+ * with the keys typing into them.
+ */
+@media (min-width: 560px) {
+  .pressure {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    column-gap: 24px;
+    row-gap: 12px;
+    align-items: start;
+  }
+
+  .pressure__reading {
+    grid-column: 1 / -1;
+  }
+
+  .pressure-row,
+  .pressure__target {
+    grid-column: 1;
+  }
+
+  .pressure .keypad {
+    grid-column: 2;
+    grid-row: 2 / span 4;
+    margin: 0;
+  }
 }
 
 /* The reading in monitor notation — 120/70 (85) — at the size the single-value sheet gives its
@@ -266,11 +337,31 @@ body {
   color: #898781;
 }
 
+/* The number is the button: tapping it points the one keypad at this row. Sized as a touch target
+   rather than as text, and outlined only when it is the one being typed into — three permanently
+   boxed numbers would say nothing, and the whole point of the box is to say which. */
 .pressure-row__value {
+  min-height: 44px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
   font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.pressure-row__value[aria-pressed='true'] {
+  border-color: #184f95;
+  background: rgb(24 79 149 / 8%);
+}
+
+.pressure-row__value:focus-visible {
+  outline: 2px solid #184f95;
+  outline-offset: 1px;
 }
 
 /* A row switched off keeps its number on screen — switching it back on must not look like
@@ -279,6 +370,25 @@ body {
   font-size: 14px;
   font-weight: 400;
   color: #898781;
+}
+
+/* Which of the three the keypad is writing into, spelled out under the rows. The selected row is
+   outlined, but the keypad is what the eye is on when it matters. */
+.pressure__target {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #52514e;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .pressure-row--off .pressure-row__short,

@@ -92,6 +92,10 @@ export function AddEntry({ record, target, onAdd, onClose }: AddEntryProps) {
       height="auto"
       title={draft === null ? pickerTitle(target) : draftTitle(draft)}
       className="entry-sheet"
+      // A sheet that opens on a value hands its focus to the field, so a desktop user types the
+      // number straight away rather than clicking into it first. A picker step has no field to
+      // hand it to and keeps the drawer's own focus, which is what Escape needs.
+      autoFocus={draft === null}
       // The step back has to sit where a thumb already is, not only in the title bar.
       footer={
         <div className="entry-sheet__footer">
