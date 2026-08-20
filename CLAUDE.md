@@ -132,6 +132,12 @@ scale.
 
 - **Verify by looking and interacting, not by reading.** Several layout defects and the touch
   defect were invisible in the source. Screenshot both form factors after any timeline change.
+- **A CSS selector aimed at AntD's own class names is an assertion nothing checks.** The entry
+  sheet's height cap was written against `.ant-drawer-content`, AntD 6 renamed that element, and
+  the rule silently stopped matching — the sheet then rendered 111px above the top of an iPad
+  window. Name the parts through the component's `classNames` prop, as `src/entry/sheet.ts` does.
+  AntD also injects its styles *after* this stylesheet, so at equal specificity it wins: qualify
+  the rule by an ancestor class rather than wondering why a padding does nothing.
 - **A green test can prove nothing.** Ask what would still pass if the feature were deleted. One
   reload test cleared storage on every navigation and watched the app re-seed, so it would have
   passed with persistence entirely broken. Ask also whether its **inputs are rounder than the
