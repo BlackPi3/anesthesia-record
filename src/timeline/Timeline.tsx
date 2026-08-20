@@ -305,7 +305,7 @@ function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
       role="img"
       aria-label={`Zeitachse von ${formatTime(window.from)} bis ${formatTime(window.to)}`}
     >
-      <text x={0} y={AXIS_HEIGHT - 9} fill={chart.secondaryInk} fontSize={12} fontWeight={500}>
+      <text x={0} y={AXIS_HEIGHT - 9} fill={chart.inkMuted} fontSize={12} fontWeight={500}>
         Uhrzeit
       </text>
       {times.map((time, index) => {
@@ -318,14 +318,14 @@ function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
               x2={x}
               y1={AXIS_HEIGHT - 6}
               y2={AXIS_HEIGHT}
-              stroke={labelled ? chart.axis : chart.grid}
+              stroke={labelled ? chart.gridMajor : chart.gridMinor}
               strokeWidth={1}
             />
             {labelled && (
               <text
                 x={x}
                 y={AXIS_HEIGHT - 11}
-                fill={chart.mutedInk}
+                fill={chart.inkMuted}
                 fontSize={12}
                 textAnchor="middle"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
@@ -762,7 +762,7 @@ function VitalLane({
           x2={area.right}
           y1={scales.value.map(value)}
           y2={scales.value.map(value)}
-          stroke={chart.grid}
+          stroke={chart.gridMinor}
           strokeWidth={1}
         />
       ))}
@@ -775,7 +775,7 @@ function VitalLane({
           x2={scales.time.map(time)}
           y1={area.top}
           y2={area.bottom}
-          stroke={chart.grid}
+          stroke={chart.gridMinor}
           strokeWidth={time % (GRID_INTERVAL_MS * 6) === 0 ? 1 : 0.5}
         />
       ))}
@@ -788,7 +788,7 @@ function VitalLane({
           x2={scales.time.map(event.at)}
           y1={area.top}
           y2={area.bottom}
-          stroke={chart.axis}
+          stroke={chart.gridMajor}
           strokeWidth={1}
           strokeDasharray="3 3"
         />
@@ -797,7 +797,7 @@ function VitalLane({
       <text x={0} y={20} fill={chart.ink} fontSize={12} fontWeight={600}>
         {lane.label}
       </text>
-      <text x={0} y={35} fill={chart.mutedInk} fontSize={11}>
+      <text x={0} y={35} fill={chart.inkMuted} fontSize={11}>
         {laneUnit(lane)}
       </text>
 
@@ -806,7 +806,7 @@ function VitalLane({
           key={value}
           x={GUTTER - 8}
           y={scales.value.map(value) + 4}
-          fill={chart.mutedInk}
+          fill={chart.inkMuted}
           fontSize={11}
           textAnchor="end"
           style={{ fontVariantNumeric: 'tabular-nums' }}
@@ -871,7 +871,7 @@ function VitalLane({
         x2={area.right}
         y1={height - 0.5}
         y2={height - 0.5}
-        stroke={chart.grid}
+        stroke={chart.gridMinor}
         strokeWidth={1}
       />
     </svg>
@@ -900,7 +900,7 @@ function Marker({
   const shared = {
     'data-entry-id': id,
     fill: color,
-    stroke: chart.surface,
+    stroke: chart.paper,
     strokeWidth: 2,
     cursor: 'grab',
   }
@@ -918,7 +918,7 @@ function Marker({
       <path
         d={`M ${x} ${tip} L ${x + 5.5} ${base} L ${x - 5.5} ${base} Z`}
         {...shared}
-        fill={chart.surface}
+        fill={chart.paper}
         stroke={color}
       />
     )
@@ -975,7 +975,7 @@ function ValueLabel({ box, points, color }: { box: Box; points: LanePoint[]; col
         width={box.width}
         height={box.height}
         rx={4}
-        fill={chart.surface}
+        fill={chart.paper}
         opacity={0.94}
         stroke={color}
         strokeOpacity={0.4}
@@ -1119,7 +1119,7 @@ function Readout({
       <text
         x={x + (boxWidth - CHEVRON_ROOM) / 2}
         y={y + 15}
-        fill={chart.surface}
+        fill={chart.paper}
         fontSize={12}
         fontWeight={600}
         textAnchor="middle"
@@ -1130,7 +1130,7 @@ function Readout({
       <path
         d={`M ${chevronX} ${middle - 4} L ${chevronX + 4} ${middle} L ${chevronX} ${middle + 4}`}
         fill="none"
-        stroke={chart.surface}
+        stroke={chart.paper}
         strokeWidth={1.6}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -1329,7 +1329,7 @@ function MedicationBand({
             <text
               x={GUTTER - 8}
               y={y + 4}
-              fill={chart.secondaryInk}
+              fill={chart.inkMuted}
               fontSize={12}
               textAnchor="end"
             >
@@ -1341,8 +1341,8 @@ function MedicationBand({
                 cx={start}
                 cy={y}
                 r={5}
-                fill={chart.secondaryInk}
-                stroke={chart.surface}
+                fill={chart.inkMuted}
+                stroke={chart.paper}
                 strokeWidth={2}
               />
             ) : (
@@ -1352,15 +1352,22 @@ function MedicationBand({
                 width={end - start}
                 height={12}
                 rx={4}
-                fill={chart.secondaryInk}
-                opacity={0.75}
+                fill={chart.inkMuted}
+                /*
+                 * Held at the weight it had under the old palette. `--ink-muted` is a good deal
+                 * darker than the `#898781` this bar used to wear, and at 0.75 the two bars became
+                 * the heaviest ink on the page while carrying the least interesting content on it.
+                 * Provisional: the bar is due to become a thin rule in the drug's own colour, at
+                 * which point this number goes away rather than being retuned.
+                 */
+                opacity={0.55}
               />
             )}
 
             <text
               x={flip ? start - 10 : end + 10}
               y={y + 4}
-              fill={chart.mutedInk}
+              fill={chart.inkMuted}
               fontSize={11}
               textAnchor={flip ? 'end' : 'start'}
               style={{ fontVariantNumeric: 'tabular-nums' }}
@@ -1434,12 +1441,12 @@ function EventBand({
 
         return (
           <Fragment key={event.id}>
-            <line x1={x} x2={x} y1={24} y2={y + 8} stroke={chart.axis} strokeWidth={1} />
-            <circle cx={x} cy={y + 8} r={4} fill={chart.secondaryInk} />
+            <line x1={x} x2={x} y1={24} y2={y + 8} stroke={chart.gridMajor} strokeWidth={1} />
+            <circle cx={x} cy={y + 8} r={4} fill={chart.inkMuted} />
             <text
               x={labelX}
               y={y + 12}
-              fill={chart.secondaryInk}
+              fill={chart.inkMuted}
               fontSize={12}
               textAnchor={flip ? 'end' : 'start'}
             >
@@ -1448,7 +1455,7 @@ function EventBand({
             <text
               x={labelX}
               y={y + 25}
-              fill={chart.mutedInk}
+              fill={chart.inkMuted}
               fontSize={11}
               textAnchor={flip ? 'end' : 'start'}
               style={{ fontVariantNumeric: 'tabular-nums' }}

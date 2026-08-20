@@ -1,7 +1,26 @@
+/*
+ * The six-value palette, mirroring `theme.ts`. AntD's own components are themed there through its
+ * tokens; these are for the hand-written CSS, and the two files carry the same hexes on purpose —
+ * one is a JS object AntD consumes, the other is what a stylesheet can `var()`.
+ *
+ * Page and card share `--paper`. They used to be two off-whites about 1.5% apart in luminance,
+ * which is not a difference anyone can see; the borders were already doing the separating, and a
+ * single ground is what makes the app read as one sheet rather than as a tray of cards.
+ *
+ * The four trace colours are deliberately not here. `laneColor` in `theme.ts` owns them, they are
+ * consumed as SVG attributes, and a second copy in CSS is a copy that drifts.
+ */
 :root {
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --hairline: #e1e0d9;
+  --paper: #fbfaf8;
+  --grid-minor: #e2e0da;
+  --grid-major: #c9c6be;
+  --ink: #14181c;
+  --ink-muted: #5c6470;
+  --accent: #2f4b7c;
+
+  /* Outside the six, and the only alarm colour the interface keeps. It says one thing — this
+     value will not be written — which is what red actually means on a clinical display. */
+  --error: #b3261e;
 
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: light;
@@ -14,8 +33,8 @@
 
 body {
   margin: 0;
-  background: var(--page);
-  color: #0b0b0b;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .app {
@@ -35,8 +54,8 @@ body {
 }
 
 .case-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--hairline);
+  background: var(--paper);
+  border-bottom: 1px solid var(--grid-minor);
   padding: 12px 20px;
   display: flex;
   flex-direction: column;
@@ -69,7 +88,7 @@ body {
 }
 
 .case-facts dt {
-  color: #898781;
+  color: var(--ink-muted);
   font-size: 13px;
 }
 
@@ -131,20 +150,20 @@ body {
   min-height: 88px;
   padding: 14px 16px;
   text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-left: 4px solid var(--hairline);
+  background: var(--paper);
+  border: 1px solid var(--grid-minor);
+  border-left: 4px solid var(--grid-minor);
   border-radius: 8px;
   cursor: pointer;
   font: inherit;
 }
 
 .picker__tile:hover {
-  border-color: #184f95;
+  border-color: var(--accent);
 }
 
 .picker__tile:focus-visible {
-  outline: 2px solid #184f95;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -172,7 +191,7 @@ body {
 }
 
 .value-field__readout:focus-visible {
-  outline: 2px solid #184f95;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -185,7 +204,7 @@ body {
 
 .value-field__unit {
   font-size: 20px;
-  color: #52514e;
+  color: var(--ink-muted);
 }
 
 /* What the metric accepts. Quiet while the number is inside it, and the reason the sheet will not
@@ -195,12 +214,12 @@ body {
   margin: 8px 0 0;
   text-align: center;
   font-size: 13px;
-  color: #898781;
+  color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .value-field__range--out {
-  color: #d03b3b;
+  color: var(--error);
   font-weight: 600;
 }
 
@@ -309,11 +328,11 @@ body {
 
 .pressure__unit {
   font-size: 18px;
-  color: #52514e;
+  color: var(--ink-muted);
 }
 
 .pressure-row {
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid var(--grid-minor);
   padding-top: 12px;
 }
 
@@ -334,7 +353,7 @@ body {
 .pressure-row__name {
   margin-left: 8px;
   font-size: 13px;
-  color: #898781;
+  color: var(--ink-muted);
 }
 
 /* The number is the button: tapping it points the one keypad at this row. Sized as a touch target
@@ -355,12 +374,12 @@ body {
 }
 
 .pressure-row__value[aria-pressed='true'] {
-  border-color: #184f95;
-  background: rgb(24 79 149 / 8%);
+  border-color: var(--accent);
+  background: rgb(47 75 124 / 8%);
 }
 
 .pressure-row__value:focus-visible {
-  outline: 2px solid #184f95;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -369,7 +388,7 @@ body {
 .pressure-row--off .pressure-row__value {
   font-size: 14px;
   font-weight: 400;
-  color: #898781;
+  color: var(--ink-muted);
 }
 
 /* Which of the three the keypad is writing into, spelled out under the rows. The selected row is
@@ -377,7 +396,7 @@ body {
 .pressure__target {
   margin: 4px 0 0;
   font-size: 13px;
-  color: #52514e;
+  color: var(--ink-muted);
 }
 
 .visually-hidden {
@@ -393,7 +412,7 @@ body {
 
 .pressure-row--off .pressure-row__short,
 .pressure-row--off .pressure-row__name {
-  color: #898781;
+  color: var(--ink-muted);
 }
 
 /* The unit belongs beside the number it applies to, so the caption sits inline rather than above. */
@@ -406,7 +425,7 @@ body {
 
 .unit-picker__caption {
   font-size: 13px;
-  color: #898781;
+  color: var(--ink-muted);
 }
 
 .other-drug__row {
@@ -420,20 +439,20 @@ body {
   min-width: 0;
   height: 48px;
   padding: 0 12px;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
+  background: var(--paper);
+  border: 1px solid var(--grid-minor);
   border-radius: 8px;
   font: inherit;
   font-size: 16px;
 }
 
 .other-drug__input:focus-visible {
-  outline: 2px solid #184f95;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
 .time-field {
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid var(--grid-minor);
   padding-top: 20px;
 }
 
@@ -442,7 +461,7 @@ body {
 .time-field__clock--running {
   font-size: 20px;
   font-weight: 500;
-  color: #52514e;
+  color: var(--ink-muted);
 }
 
 /*
@@ -450,7 +469,7 @@ body {
  * context for the change, not the subject of the screen.
  */
 .history {
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid var(--grid-minor);
   padding-top: 16px;
 }
 
@@ -458,7 +477,7 @@ body {
   margin: 0 0 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #52514e;
+  color: var(--ink-muted);
 }
 
 .history__list {
@@ -474,11 +493,11 @@ body {
   display: flex;
   gap: 12px;
   font-size: 13px;
-  color: #52514e;
+  color: var(--ink-muted);
 }
 
 .history__time {
-  color: #898781;
+  color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -494,7 +513,7 @@ body {
 
 .time-field__caption {
   font-size: 13px;
-  color: #898781;
+  color: var(--ink-muted);
 }
 
 .time-field__clock {
@@ -516,8 +535,8 @@ body {
 }
 
 .timeline {
-  background: var(--surface);
-  border: 1px solid var(--hairline);
+  background: var(--paper);
+  border: 1px solid var(--grid-minor);
   border-radius: 8px;
   padding: 12px 16px;
   /* The timeline owns its width; nothing inside may push the page sideways. */
@@ -564,8 +583,8 @@ body {
   flex-direction: column;
   gap: 4px;
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
+  background: var(--paper);
+  border: 1px solid var(--grid-minor);
   border-radius: 8px;
   padding: 20px 28px;
 }
@@ -574,13 +593,13 @@ body {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #0b0b0b;
+  color: var(--ink);
 }
 
 .timeline__empty-hint {
   margin: 0;
   font-size: 14px;
-  color: #52514e;
+  color: var(--ink-muted);
 }
 
 .timeline__lane + .timeline__lane,
@@ -671,18 +690,18 @@ body {
 }
 
 .timeline__hit:hover {
-  fill: rgb(11 11 11 / 4%);
+  fill: rgb(20 24 28 / 4%);
 }
 
 .timeline__hit:focus-visible {
-  fill: rgb(24 79 149 / 8%);
-  outline: 2px solid #184f95;
+  fill: rgb(47 75 124 / 8%);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
 /* Lanes are keyboard-reachable, so the focus ring has to be real and visible. */
 .timeline__lane:focus-visible {
-  outline: 2px solid #184f95;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -701,12 +720,12 @@ body {
 }
 
 .timeline__readout:focus-visible {
-  outline: 2px solid #184f95;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
 .timeline__readout:focus-visible rect {
-  stroke: #fff;
+  stroke: var(--paper);
   stroke-width: 1.5;
   opacity: 0.95;
 }

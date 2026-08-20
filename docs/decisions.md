@@ -734,6 +734,51 @@ downloads, and it is what runs locally before a commit.
 
 ---
 
+## 2026-08-20 — Palette cut to six interface values plus four traces
+
+**What:** `theme.ts` and `index.css` now carry one set of tokens: `--paper #FBFAF8` as the single
+ground for page and card, `--grid-minor #E2E0DA` and `--grid-major #C9C6BE`, two inks
+(`--ink #14181C`, `--ink-muted #5C6470`), and one interactive accent `--accent #2F4B7C`. The lane
+traces are separate from all of it: SpO₂ `#185FA5`, Herzfrequenz `#0F6E56`, Blutdruck `#8C2F39`,
+Temperatur `#5B4B8A`.
+
+**Why:** the previous set had grown to three greys, two blues and a categorical ramp chosen for
+distinctness rather than for meaning. Two of its four traces — a green at 2.74:1 and a yellow at
+2.11:1 against the old surface — were both hard to see and, worse, the colours IEC 60601-1-8 gives
+alarm meaning to. Every anesthesiologist reading this has those wired in from Dräger and Philips,
+so spending them on a temperature line costs real signal.
+
+**Temperature is the one hue not taken from the design specification.** That document has no
+temperature band at all and reserves red, amber, green and cyan, so its three trace colours do not
+cover the fourth lane the brief makes mandatory. Muted violet was chosen over a slate-brown (too
+near `--ink-muted` at a 2px stroke) and over leaving the lane grey (which draws a mandatory
+parameter as chrome).
+
+**Page and card share one ground.** They were previously `#f9f9f7` and `#fcfcfb`, about 1.5% apart
+in luminance — not a difference anyone can see, and the borders were already doing the separating.
+
+**On the 7:1 target.** The specification asks 7:1 of "anything numeric". `--ink` is 17.1:1 and
+carries every value and dose, so that is met where it matters. `--ink-muted` is 5.7:1 on axis
+numbers and secondary labels: short of 7:1, kept at the specified hex, and still a repair of a real
+defect, because the `#898781` it replaces was 3.5:1 and failed WCAG AA outright at 11–13px. The
+four traces are graphics, not text, so the binding floor is 3:1; they run 5.95:1 to 7.80:1.
+
+**What did not change:** every lane keeps its permanent text label. The reason is now different —
+all four traces clear 3:1 comfortably, so the label is no longer a contrast concession — but a
+protocol is read by its labels and identity should not rest on hue even when the hue is legible.
+
+**Rejected:** leaving `colorSuccess` and `colorWarning` at AntD's green and amber. They are bound
+to `--ink-muted` instead, so a later `type="success"` cannot put alarm green on a clinical display
+without someone deciding to. `colorError` stays red at `#B3261E`: the message it renders is that
+the record stopped persisting, and there red means what red means.
+
+**One provisional number:** the infusion bar's opacity dropped from 0.75 to 0.55, because
+`--ink-muted` is darker than the grey it replaced and the two bars would otherwise have become the
+heaviest ink on the page while carrying the least interesting content on it. It goes away when the
+bar becomes a thin rule in the drug's own colour, rather than being retuned.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
