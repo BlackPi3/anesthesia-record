@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Alert, Typography } from 'antd'
+import { Alert, Button, Typography } from 'antd'
 
 import { CaseHeader } from './CaseHeader'
 import { createDemoCase } from './domain/demoCase'
@@ -21,28 +21,39 @@ import { EditEntry } from './entry/EditEntry'
 import { addDraft, correctDraft } from './entry/draft'
 import { targetKey, type AddTarget } from './entry/target'
 import { correctVital, removeEntry } from './domain/mutations'
-import { loadCase, saveCase } from './domain/storage'
+import { clearCase, loadCase, saveCase } from './domain/storage'
 import type { AnesthesiaCase } from './domain/types'
 import { Timeline } from './timeline/Timeline'
 import { useCase } from './useCase'
 
-type Opened = { kind: 'ready'; record: AnesthesiaCase } | { kind: 'error'; message: string }
+/**
+ * `recoverable` is the screen's question, not storage's. `loadCase` reports *what* failed; this is
+ * the one conclusion the error screen draws from it — whether there is anything the user can press
+ * to get out. Only a `content` failure qualifies: the bytes under the key are unreadable but the
+ * key can still be written, so discarding them ends the failure. A denied storage API cannot be
+ * argued with, and neither can a seed that would not save, since nothing is stored to discard.
+ */
+type Opened =
+  | { kind: 'ready'; record: AnesthesiaCase }
+  | { kind: 'error'; message: string; recoverable: boolean }
 
 function openCase(): Opened {
   const result = loadCase()
 
-  if (result.status === 'error') return { kind: 'error', message: result.message }
+  if (result.status === 'error') {
+    return { kind: 'error', message: result.message, recoverable: result.cause === 'content' }
+  }
   if (result.status === 'loaded') return { kind: 'ready', record: result.case }
 
   const seeded = createDemoCase()
   const saved = saveCase(seeded)
   return saved.status === 'error'
-    ? { kind: 'error', message: saved.message }
+    ? { kind: 'error', message: saved.message, recoverable: false }
     : { kind: 'ready', record: seeded }
 }
 
 export default function App() {
-  const [opened] = useState<Opened>(openCase)
+  const [opened, setOpened] = useState<Opened>(openCase)
 
   if (opened.kind === 'error') {
     return (
@@ -54,9 +65,44 @@ export default function App() {
           description={opened.message}
           style={{ maxWidth: 520 }}
         />
-        <Typography.Text type="secondary">
-          Prüfen Sie, ob der Browser lokalen Speicher zulässt, und laden Sie die Seite neu.
-        </Typography.Text>
+        {opened.recoverable ? (
+          <>
+            {/* Without this the screen is a dead end. Reloading re-reads the same unreadable
+                bytes and fails identically every time, so the advice given for a denied storage
+                API — check the browser, reload — is not merely unhelpful here, it is wrong: the
+                browser is allowing storage, and the app is bricked on this device until somebody
+                opens the developer tools.
+
+                It asks nothing first, in keeping with every other action in the app. The
+                difference is that this one cannot be undone, because undo lives inside a case
+                that never loaded — so the consequence is spelled out on the button's own line
+                rather than in a dialog that would be dismissed without being read. Nothing
+                readable is being discarded: the data is already unreadable, which is why this
+                screen is on. */}
+            <Button
+              type="primary"
+              size="large"
+              // Cleared and re-read here, then handed to `setOpened` as a finished value. Both
+              // calls are side effects, and a state updater has to be pure — React runs updaters
+              // twice in development precisely to surface this, which here would mean clearing
+              // storage twice and re-seeding over the first seed.
+              onClick={() => {
+                clearCase()
+                setOpened(openCase())
+              }}
+            >
+              Gespeicherte Daten verwerfen und neu beginnen
+            </Button>
+            <Typography.Text type="secondary" style={{ maxWidth: 520, textAlign: 'center' }}>
+              Die unlesbaren Daten werden dabei endgültig gelöscht. Das Protokoll beginnt
+              anschließend neu mit den Demodaten.
+            </Typography.Text>
+          </>
+        ) : (
+          <Typography.Text type="secondary">
+            Prüfen Sie, ob der Browser lokalen Speicher zulässt, und laden Sie die Seite neu.
+          </Typography.Text>
+        )}
       </div>
     )
   }

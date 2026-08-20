@@ -93,6 +93,74 @@ test('reports a clear error when the stored case is corrupt', async ({ page }) =
   await expect(page.getByText(/beschädigt/)).toBeVisible()
 })
 
+/**
+ * The error screen has to be a way out, not just a description.
+ *
+ * Reloading cannot fix unreadable data — it reads the same bytes and fails the same way — so
+ * without the discard the app is finished on this device. The test proves the route rather than
+ * the button: it comes back through the corrupt state, presses the one control offered, and then
+ * asks the record and the storage whether the app is actually working again. Deleting the button
+ * fails it at the click; leaving a button that only clears without re-seeding fails it at the
+ * heading.
+ */
+test('offers a way out of unreadable data, and the way out works', async ({ page }) => {
+  // Corrupted once, not from an `addInitScript`. An init script runs again on every navigation,
+  // so it would put the bad value back at the final reload and report a working recovery as
+  // broken — which is what it did on the first run of this test.
+  await page.evaluate(() => {
+    window.localStorage.setItem('anesthesia-record:case', '{ this is not json')
+  })
+  await page.reload()
+
+  // Said plainly before it is done, because this is the one action in the app that undo cannot
+  // take back: the case it would undo inside never loaded.
+  await expect(page.getByText(/endgültig gelöscht/)).toBeVisible()
+
+  await page.getByRole('button', { name: 'Gespeicherte Daten verwerfen und neu beginnen' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Mustermann, Erika' })).toBeVisible()
+  await expect(page.getByRole('group', { name: /Blutdruck, Achse/ })).toBeVisible()
+
+  // Recovered in storage too, not only on screen: a repaired screen over a still-corrupt key
+  // would fail again on the next reload, which is the failure this whole screen exists to end.
+  const entries = await page.evaluate(() => {
+    const raw = window.localStorage.getItem('anesthesia-record:case')
+    if (raw === null) throw new Error('nothing was written back')
+    return JSON.parse(raw).case.entries.length
+  })
+  expect(entries).toBeGreaterThan(0)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Mustermann, Erika' })).toBeVisible()
+})
+
+/**
+ * The other half of the distinction. A denied storage API is not recoverable by discarding
+ * anything, so the app must not offer a button that would do nothing — it keeps the advice that
+ * is actually true in that case. Without the `cause` field both failures would read identically
+ * and one of the two screens would be lying.
+ */
+test('when storage itself is denied, it advises rather than offering a useless button', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const denied = () => {
+      throw new DOMException('denied', 'SecurityError')
+    }
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get: () => ({ getItem: denied, setItem: denied, removeItem: denied }),
+    })
+  })
+  await page.reload()
+
+  await expect(page.getByText(/Auf den lokalen Speicher kann nicht zugegriffen werden/)).toBeVisible()
+  await expect(page.getByText(/Prüfen Sie, ob der Browser lokalen Speicher zulässt/)).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Gespeicherte Daten verwerfen und neu beginnen' }),
+  ).toHaveCount(0)
+})
+
 test('says so when the record holds nothing yet', async ({ page }) => {
   // Emptied through the app's own stored envelope rather than a hand-written one, so the test
   // cannot pass against a storage format the app no longer writes.

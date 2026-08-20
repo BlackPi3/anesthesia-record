@@ -28,10 +28,24 @@ interface Envelope {
   case: AnesthesiaCase
 }
 
+/**
+ * What failed to load, which is a different question from what to tell the user.
+ *
+ * `access` is the browser refusing the API itself — a Safari private window, a blocked origin.
+ * Nothing the app does to the stored value can help, because it cannot reach the value at all.
+ *
+ * `content` is the key holding something this version cannot read: truncated, hand-edited, or
+ * written by an older schema. Storage works; only the bytes under the key are unusable. That
+ * distinction is the whole point of the field — a `content` failure is one the user can recover
+ * from by discarding what is stored, and without that route the app is bricked on the device,
+ * because every reload reads the same bytes and fails in exactly the same way.
+ */
+export type LoadFailure = 'access' | 'content'
+
 export type LoadResult =
   | { status: 'empty' }
   | { status: 'loaded'; case: AnesthesiaCase; savedAt: Timestamp }
-  | { status: 'error'; message: string }
+  | { status: 'error'; cause: LoadFailure; message: string }
 
 export type SaveResult =
   | { status: 'saved'; savedAt: Timestamp }
@@ -82,6 +96,7 @@ export function loadCase(): LoadResult {
   } catch {
     return {
       status: 'error',
+      cause: 'access',
       message: 'Auf den lokalen Speicher kann nicht zugegriffen werden.',
     }
   }
@@ -94,6 +109,7 @@ export function loadCase(): LoadResult {
   } catch {
     return {
       status: 'error',
+      cause: 'content',
       message: 'Die gespeicherten Falldaten sind beschädigt und können nicht gelesen werden.',
     }
   }
@@ -101,6 +117,7 @@ export function loadCase(): LoadResult {
   if (typeof parsed !== 'object' || parsed === null) {
     return {
       status: 'error',
+      cause: 'content',
       message: 'Die gespeicherten Falldaten sind beschädigt und können nicht gelesen werden.',
     }
   }
@@ -110,6 +127,7 @@ export function loadCase(): LoadResult {
   if (envelope.schemaVersion !== SCHEMA_VERSION) {
     return {
       status: 'error',
+      cause: 'content',
       message: 'Die gespeicherten Falldaten stammen aus einer älteren Version der Anwendung.',
     }
   }
@@ -117,6 +135,7 @@ export function loadCase(): LoadResult {
   if (!isCase(envelope.case)) {
     return {
       status: 'error',
+      cause: 'content',
       message: 'Die gespeicherten Falldaten sind unvollständig.',
     }
   }

@@ -189,6 +189,10 @@ data from an older shape is reported rather than guessed at.
 fields the app dereferences, not full runtime validation. A schema validator (zod) is the right
 answer for a format that outlives the code and is the natural next step if the model grows.
 
+**Extended on 2026-08-21** — see „A load failure gets a way out“ below. The union was right;
+one flat `error` variant was not, because it left the UI unable to tell a failure it could offer a
+way out of from one it could not.
+
 ---
 
 ## 2026-08-11 — Timeline laid out as one lane per vital parameter
@@ -1139,6 +1143,39 @@ keyboard handling are untouched; the blood pressure sheet's typing now reaches t
 pressure from the keypad column and from the rows, which are the only two places its focus can be,
 and deliberately not from the time controls, where a digit is not a value. 99 unit tests and the
 Playwright suite green.
+
+---
+
+## 2026-08-21 — A load failure gets a way out, and says which kind it is
+
+**What:** `LoadResult`'s error variant carries a `cause` of `'access'` or `'content'`. On a
+`content` failure the error screen offers „Gespeicherte Daten verwerfen und neu beginnen", which
+clears the key and re-seeds the demo case. On an `access` failure it keeps the existing advice and
+offers no button. Extends the entry of 2026-08-11 above rather than replacing it.
+
+**Why:** Found by exercising the state rather than reading it, during the cold-start and error
+pass of 2026-08-21. The screen was a dead end. Its only advice — „Prüfen Sie, ob der Browser
+lokalen Speicher zulässt, und laden Sie die Seite neu" — is *wrong* for a corrupt, outdated or
+incomplete stored case: the browser is allowing storage, and reloading reads the same unreadable
+bytes and fails identically every time. The app was bricked on that device until somebody opened
+the developer tools. Part 2 grades clear error states and safe correction workflows, and an error
+state with no exit is neither.
+
+**Why the field and not a boolean in the UI:** `loadCase` reports what failed; whether that leaves
+the user anything to press is a conclusion, and it is drawn once, in `App.tsx`, as `recoverable`.
+A denied storage API cannot be argued with, and neither can a seed that would not save — nothing
+is stored to discard in either case.
+
+**Rejected:** offering the discard on every failure (it would do nothing when storage is denied,
+since `removeItem` throws too, and a button that cannot work is worse than advice that cannot
+help). A confirmation dialog (the house answer is undo, not confirmation — but undo lives inside a
+case that never loaded, so instead the consequence is stated in plain text beside the button;
+nothing readable is being discarded, because the data being unreadable is why the screen is on).
+
+**What the tests had to be told:** the first version of the recovery test corrupted storage in an
+`addInitScript`, which re-ran on the closing reload and put the bad value back — reporting a
+working recovery as broken. It now corrupts once through `page.evaluate`. The test asserts against
+`localStorage` and survives a reload, so a screen repaired over a still-corrupt key fails it.
 
 ---
 
