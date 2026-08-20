@@ -189,7 +189,16 @@ that button is what says which entry is being made: a single-metric lane opens s
 value field, with no picker in between. `src/entry/target.ts` is the whole of that mapping — what
 a lane's button opens, and which two still need a list first.
 
-The value field is a large readout above a keypad. The number is typed: whoever is filling this in
+The sheet itself is a card rather than a screen: at most 880px wide, centred, bordered like every
+other surface in the app, and never taller than the window — the header and the footer are fixed
+and only the body between them scrolls. Its body is two columns wherever there is room for them,
+the number and the keypad typing it on the left and what the entry says about itself on the right,
+which is what keeps the tallest form in the app — a continuous infusion, with a rate, a unit, a
+start and an end — inside an iPad in landscape. Every part of the drawer is named through AntD's
+`classNames` in [`src/entry/sheet.ts`](src/entry/sheet.ts); the reason that matters is in
+`docs/learning.md`.
+
+The value field is a large readout above a keypad, framed together as one plate. The number is typed: whoever is filling this in
 is reading 133 off a monitor and already knows the value, so the shortest path from what they know
 to what the record holds is three digits — and typing is exact by construction, which no gesture on
 these axes is. The keypad is in the sheet rather than the system's, because the sheet is a drawer at

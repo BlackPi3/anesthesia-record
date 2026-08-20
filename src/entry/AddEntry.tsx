@@ -38,6 +38,7 @@ import type {
   PhaseEventKind,
   VitalKind,
 } from '../domain/types'
+import { formatNumber } from '../format'
 import { snapToStep } from '../timeline/scales'
 import { BloodPressureForm } from './BloodPressureForm'
 import { EntryForm } from './EntryForm'
@@ -48,6 +49,7 @@ import {
   type Draft,
   type NewDraft,
 } from './draft'
+import { SHEET_PARTS } from './sheet'
 import type { AddTarget } from './target'
 
 /** How a medication is given. Chosen before the drug, since it decides what the form asks for. */
@@ -91,14 +93,18 @@ export function AddEntry({ record, target, onAdd, onClose }: AddEntryProps) {
       placement="bottom"
       height="auto"
       title={draft === null ? pickerTitle(target) : draftTitle(draft)}
-      className="entry-sheet"
+      // Every part of the drawer is named, rather than one class on the outside and CSS reaching
+      // in for AntD's own element names. Those names changed in AntD 6 and the height cap written
+      // against them silently stopped matching — see the entry sheet block in `index.css`.
+      classNames={SHEET_PARTS}
       // A sheet that opens on a value hands its focus to the field, so a desktop user types the
       // number straight away rather than clicking into it first. A picker step has no field to
       // hand it to and keeps the drawer's own focus, which is what Escape needs.
       autoFocus={draft === null}
       // The step back has to sit where a thumb already is, not only in the title bar.
       footer={
-        <div className="entry-sheet__footer">
+        <>
+          <span className="entry-sheet__spacer" />
           <Button size="large" onClick={back}>
             {picks && draft !== null ? 'Zurück' : 'Abbrechen'}
           </Button>
@@ -107,13 +113,14 @@ export function AddEntry({ record, target, onAdd, onClose }: AddEntryProps) {
               Übernehmen
             </Button>
           )}
-        </div>
+        </>
       }
     >
-      <div className="entry-sheet__body">
+      <div className="entry-sheet__content">
         {draft === null ? (
           target.kind === 'medication' ? (
             <MedicationPicker
+              record={record}
               mode={mode}
               onMode={setMode}
               onPick={(drug) => setDraft(newMedication(record, drug, mode))}
@@ -212,6 +219,26 @@ function lastGiven<T extends BolusEntry | InfusionEntry>(
   return matches.length > 0 ? matches[matches.length - 1] : null
 }
 
+/**
+ * What this drug was last given at in this case, given the same way, as it is written on the band.
+ *
+ * Shown on the tile because it is the number the sheet behind that tile will open on, and because
+ * an 88px tile holding one word was screen spent on nothing. It is a documented fact from this
+ * case, worded the way the lane rail words one — never a proposal, and never a number from
+ * anywhere but the record in front of the person reading it.
+ */
+function lastDose(record: AnesthesiaCase, drug: string, mode: MedicationMode): string | null {
+  if (mode === 'bolus') {
+    const previous = lastGiven<BolusEntry>(record, drug, 'bolus')
+    return previous === null ? null : `${formatNumber(previous.dose)} ${previous.unit}`
+  }
+
+  const previous = lastGiven<InfusionEntry>(record, drug, 'infusion')
+  return previous === null
+    ? null
+    : `${formatNumber(previous.rate, previous.rate < 1 ? 1 : 0)} ${previous.unit}`
+}
+
 function newMedication(record: AnesthesiaCase, drug: string, mode: MedicationMode): Draft {
   const at = caseNow(record)
 
@@ -258,10 +285,12 @@ function newEvent(record: AnesthesiaCase, event: PhaseEventKind): Draft {
  * that cannot document an unlisted drug is worse than one that accepts a typo.
  */
 function MedicationPicker({
+  record,
   mode,
   onMode,
   onPick,
 }: {
+  record: AnesthesiaCase
   mode: MedicationMode
   onMode: (mode: MedicationMode) => void
   onPick: (drug: string) => void
@@ -287,11 +316,15 @@ function MedicationPicker({
       </div>
 
       <div className="picker" role="group" aria-label="Medikament auswählen">
-        {[...DRUGS, ...FLUIDS].map((drug) => (
-          <button key={drug} type="button" className="picker__tile" onClick={() => onPick(drug)}>
-            <span className="picker__lead">{drug}</span>
-          </button>
-        ))}
+        {[...DRUGS, ...FLUIDS].map((drug) => {
+          const last = lastDose(record, drug, mode)
+          return (
+            <button key={drug} type="button" className="picker__tile" onClick={() => onPick(drug)}>
+              <span className="picker__lead">{drug}</span>
+              {last !== null && <span className="picker__note">zuletzt {last}</span>}
+            </button>
+          )
+        })}
       </div>
 
       <div className="other-drug">

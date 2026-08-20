@@ -554,6 +554,59 @@ fix for either would have left the other in place — a retry would have hidden 
 drops requests, and the preview server alone still failed one run in three.
 
 
+## 2026-08-20 — A CSS rule that selects nothing fails silently, and one that loses does too
+
+The entry sheet was meant to be capped at 92vh so that its header and footer stayed on screen and
+only its body scrolled. It never was. On an 810px iPad viewport the medication sheet measured:
+
+```
+wrapper  top -111  height 921   max-height: none
+header   top -111  bottom -52
+body                              overflow-y: auto   (never scrolled: nothing constrained it)
+```
+
+The title bar was 111px above the top of the window, and there was no scroll anywhere that could
+bring it back. The cap was written as:
+
+```css
+.entry-sheet .ant-drawer-content-wrapper,
+.entry-sheet .ant-drawer-content { max-height: 92vh; }
+```
+
+Both selectors are wrong, in two different ways, and neither says so:
+
+- **`.ant-drawer-content` does not exist in AntD 6.** It is `ant-drawer-section` now. A renamed
+  element takes its rule with it and leaves no trace — no console warning, no failing test, just a
+  property that was never applied.
+- **`.entry-sheet` is *inside* `.ant-drawer-content-wrapper`, not around it.** A single `className`
+  on a compound component lands on whichever element that component chose, and here it is the
+  panel. The descendant combinator was pointing the wrong way up the tree.
+
+Then the second half. Once the parts were named properly through AntD's `classNames`, the padding
+rules still lost:
+
+```
+.entry-sheet__head → padding: 16px 24px      /* AntD's, not the 12px 20px asked for */
+```
+
+AntD injects its component styles into the document at runtime, after the imported stylesheet has
+been parsed. Two rules of equal specificity, and the later one wins — so every property AntD also
+declares (padding, border colour) came out AntD's, while every property it leaves alone (border
+radius, display) came out ours. That is why the fix looks arbitrary from the outside: qualifying
+the rule as `.entry-sheet__card .entry-sheet__head` is not decoration, it is the one class of
+specificity that beats a stylesheet loaded after this one.
+
+**What this cost, and what it should have cost.** Both faults were invisible in the source: the CSS
+reads exactly like CSS that works. The screenshot showed the symptom instantly — a sheet with no
+title bar — and `getBoundingClientRect` on four elements gave the whole diagnosis in one run. The
+rule from `CLAUDE.md` that applies is the one already written there: *verify by looking, not by
+reading.* The one to add is narrower — **a selector written against another library's internal
+class names is an assertion about that library's DOM, and nothing in the toolchain checks it.**
+Name the parts through the component's own API where it offers one, and the assertion becomes the
+component's problem instead of yours.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

@@ -1,6 +1,12 @@
 /**
  * The body of the entry sheet: whatever the draft needs set, and the time it happened.
  *
+ * Two columns where the sheet is wide enough for them — the number and its keypad on the left,
+ * the unit, the timestamp and an infusion's end on the right. Stacked, those five blocks were
+ * taller than an iPad in landscape and the sheet ran off the top of the window; side by side they
+ * fit, and the arrangement is `index.css`'s, not this file's. What this component decides is only
+ * which of the two groups each control belongs to.
+ *
  * Controlled, like `ValueField` and for the same reason. It holds no draft of its own and reports
  * every change upward, so the sheet that opened it owns the one copy — a form that kept its own
  * would drift from the entry it is correcting the moment anything else touched the record.
@@ -36,23 +42,45 @@ export interface EntryFormProps {
 }
 
 export function EntryForm({ record, draft, onChange }: EntryFormProps) {
+  // A milestone is a time and nothing else, so its sheet is one column. Everything else is a
+  // number on the left and what the entry says about itself on the right — which is what keeps an
+  // infusion, the tallest form here, inside an iPad window in landscape.
+  const timeOnly = draft.type === 'event'
+
   return (
-    <>
+    <div className={timeOnly ? 'entry-form entry-form--time-only' : 'entry-form'}>
       {draft.type === 'vital' && (
-        <ValueField
-          amount={vitalAmount(draft.vital)}
-          value={draft.value}
-          onChange={(value) => onChange({ ...draft, value })}
-        />
+        <div className="entry-form__value">
+          <ValueField
+            amount={vitalAmount(draft.vital)}
+            value={draft.value}
+            onChange={(value) => onChange({ ...draft, value })}
+          />
+        </div>
       )}
 
       {draft.type === 'bolus' && (
-        <>
+        <div className="entry-form__value">
           <ValueField
             amount={bolusAmount(draft.unit)}
             value={draft.dose}
             onChange={(dose) => onChange({ ...draft, dose })}
           />
+        </div>
+      )}
+
+      {draft.type === 'infusion' && (
+        <div className="entry-form__value">
+          <ValueField
+            amount={infusionAmount(draft.unit)}
+            value={draft.rate}
+            onChange={(rate) => onChange({ ...draft, rate })}
+          />
+        </div>
+      )}
+
+      <div className="entry-form__meta">
+        {draft.type === 'bolus' && (
           <UnitPicker
             label="Einheit"
             units={BOLUS_UNITS}
@@ -62,41 +90,34 @@ export function EntryForm({ record, draft, onChange }: EntryFormProps) {
             // dose on the user's behalf.
             onChange={(unit: BolusUnit) => onChange({ ...draft, unit })}
           />
-        </>
-      )}
+        )}
 
-      {draft.type === 'infusion' && (
-        <>
-          <ValueField
-            amount={infusionAmount(draft.unit)}
-            value={draft.rate}
-            onChange={(rate) => onChange({ ...draft, rate })}
-          />
+        {draft.type === 'infusion' && (
           <UnitPicker
             label="Einheit"
             units={INFUSION_UNITS}
             unit={draft.unit}
             onChange={(unit: InfusionRateUnit) => onChange({ ...draft, unit })}
           />
-        </>
-      )}
+        )}
 
-      <TimeField
-        caption={draft.type === 'infusion' ? 'Beginn' : 'Zeitpunkt'}
-        at={draftTime(draft)}
-        min={record.startedAt}
-        now={caseNow(record)}
-        onChange={(at) => onChange(withTime(draft, at))}
-      />
-
-      {draft.type === 'infusion' && (
-        <InfusionEnd
-          draft={draft}
+        <TimeField
+          caption={draft.type === 'infusion' ? 'Beginn' : 'Zeitpunkt'}
+          at={draftTime(draft)}
+          min={record.startedAt}
           now={caseNow(record)}
-          onChange={(endedAt) => onChange({ ...draft, endedAt })}
+          onChange={(at) => onChange(withTime(draft, at))}
         />
-      )}
-    </>
+
+        {draft.type === 'infusion' && (
+          <InfusionEnd
+            draft={draft}
+            now={caseNow(record)}
+            onChange={(endedAt) => onChange({ ...draft, endedAt })}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 

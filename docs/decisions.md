@@ -1085,6 +1085,63 @@ green: 99 unit tests, 237 Playwright runs.
 
 ---
 
+## 2026-08-20 — The entry sheet is a bounded card, and its body is two columns
+
+**What:** the drawer that creates and corrects entries was reworked. It is now a card of at most
+880px, centred, with rounded top corners, a `--grid-minor` border and a mask at 32% rather than
+AntD's 45%, so the ruled canvas stays visible around and under it. Its height is capped at
+`calc(100dvh - 32px)`, with the header and footer fixed and only the body scrolling. Inside, every
+form is two columns: the number and the keypad that types it on the left, what the entry says about
+itself — unit, timestamp, an infusion's end — on the right. `BloodPressureForm` was moved onto the
+same grid, and every part of the drawer is now named through AntD's `classNames` (`sheet.ts`).
+
+**Why:** three separate faults, one of them a real defect.
+
+- **The height cap had never worked.** `.entry-sheet .ant-drawer-content` selected nothing: AntD 6
+  renamed that element to `ant-drawer-section` *and* puts the `className` on it rather than above
+  it, so the rule was neither matching the wrapper nor the panel. Measured on an 810px iPad
+  viewport, the medication sheet rendered 921px tall with its own title bar 111px **above** the top
+  of the window and no scroll that could reach it — the „Übernehmen“ and „Zurück“ buttons were
+  visible, the title and the top of the readout were not. `docs/learning.md` has the cascade half
+  of this.
+- **Stacked, the forms were taller than the window.** A readout, a range line, a keypad, a unit row
+  and two time controls in one 640px column is about 750px of body before the header and footer.
+  Two columns makes the same infusion form 513px on the same viewport, and it fits a 680px laptop
+  window with room to spare. The blood pressure sheet had already been given a side-by-side layout
+  for exactly this reason at a 560px breakpoint; that was the right idea applied to one form, and
+  it is now the layout of all of them.
+- **It did not look like the rest of the app.** A full-bleed white panel over a 45% mask is a screen
+  that replaced the record, not a sheet laid on it. Everything else in this app is bounded, ruled
+  and bordered in `--grid-minor`; the entry sheet was the one surface that was not, and a
+  correction is made while looking at the curve that prompted it.
+
+**The readout is a plate now, not floating text.** The number, its unit and the accepted range sit
+in one bordered box the width of the keypad below it, and the box border turns `--error` when the
+typed number is outside the range. Loose in the middle of a sheet, the largest element on screen
+promised nothing about where its input came from; framed above the keys, it reads as the field they
+write into, which is what it is. `Range` no longer computes the out-of-range test itself — the
+field does, because the whole plate wears it.
+
+**The drug tiles show what this case last gave.** They were 88px boxes holding one word in the
+top-left corner. They are now 60px, and where the case holds a previous dose of that drug given the
+same way, the tile carries it: „zuletzt 150 mg“, in the mono face, worded as the lane rail words
+its own last value. That number is not a suggestion and not a dosing aid — it is a fact already in
+this record, and it is the number the sheet behind the tile will open on, which the tile was
+previously hiding until after the tap.
+
+**What was rejected.** Sizing the card to its content (`width: max-content`) would let the picker
+grid and the two-column body disagree about how wide the sheet should be, and the sheet would
+change width between steps of the same flow. A modal centred in the window was rejected for the
+reason the drawer was chosen originally: on an iPad the bottom edge is where the hand already is.
+
+**No behaviour changed.** The gestures, the draft model, `isComplete`, the audit trail and the
+keyboard handling are untouched; the blood pressure sheet's typing now reaches the selected
+pressure from the keypad column and from the rows, which are the only two places its focus can be,
+and deliberately not from the time controls, where a digit is not a value. 99 unit tests and the
+Playwright suite green.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored

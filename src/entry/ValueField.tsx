@@ -70,8 +70,16 @@ export function ValueField({ amount: meta, value, onChange, autoFocus = true }: 
     onChange(nudge(value, direction, meta))
   }
 
+  // A number the field will not save. It marks the whole plate rather than only the line under it:
+  // the number is what is wrong, and `isComplete` in draft.ts is what actually holds the sheet
+  // shut. See `Range` below for why typing can reach here at all.
+  const out = value < meta.min || value > meta.max
+
   return (
-    <div className="value-field" onKeyDown={(event) => handleKey(event, press, step)}>
+    <div
+      className={out ? 'value-field value-field--out' : 'value-field'}
+      onKeyDown={(event) => handleKey(event, press, step)}
+    >
       {/* A spinbutton rather than a text input: there is a value, a range and a step, and the field
           takes digits without wanting the system keyboard on top of the sheet. */}
       <div
@@ -89,7 +97,7 @@ export function ValueField({ amount: meta, value, onChange, autoFocus = true }: 
         <span className="value-field__unit">{meta.unit}</span>
       </div>
 
-      <Range meta={meta} value={value} />
+      <Range meta={meta} out={out} />
 
       <Keypad amount={meta} onKey={press} onStep={step} />
     </div>
@@ -103,9 +111,7 @@ export function ValueField({ amount: meta, value, onChange, autoFocus = true }: 
  * the field and has to be shown as wrong rather than silently corrected. `isComplete` is what
  * actually holds the sheet shut; this line is what says why.
  */
-function Range({ meta, value }: { meta: AmountMeta; value: number }) {
-  const out = value < meta.min || value > meta.max
-
+function Range({ meta, out }: { meta: AmountMeta; out: boolean }) {
   return (
     <p className={out ? 'value-field__range value-field__range--out' : 'value-field__range'}>
       {out && <span className="value-field__range-lead">Zulässig: </span>}

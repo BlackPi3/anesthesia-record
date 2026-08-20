@@ -19,6 +19,7 @@ import { Button, Drawer } from 'antd'
 import type { AnesthesiaCase, Entry } from '../domain/types'
 import { formatTime } from '../format'
 import { EntryForm } from './EntryForm'
+import { SHEET_PARTS } from './sheet'
 import { draftFrom, draftTitle, isComplete, type Draft } from './draft'
 
 export interface EditEntryProps {
@@ -50,13 +51,14 @@ export function EditEntry({ record, entry, onCorrect, onRemove, onClose }: EditE
       placement="bottom"
       height="auto"
       title={draftTitle(draft)}
-      className="entry-sheet"
+      // The same five names the creating sheet uses, from the same place. See `sheet.ts`.
+      classNames={SHEET_PARTS}
       // The value field takes the focus instead, so a correction can be typed on arrival. A
       // milestone is the one entry with no value to type, so that sheet keeps the drawer's own
       // focus — something inside has to hold it, or Escape has nothing to close.
       autoFocus={draft.type === 'event'}
       footer={
-        <div className="entry-sheet__footer">
+        <>
           {/* Removal sits apart from the other two, on the side a thumb reaches last. It is the
               one action here that takes something off the chart. */}
           <Button size="large" danger onClick={remove}>
@@ -69,10 +71,10 @@ export function EditEntry({ record, entry, onCorrect, onRemove, onClose }: EditE
           <Button size="large" type="primary" disabled={!isComplete(draft)} onClick={commit}>
             Übernehmen
           </Button>
-        </div>
+        </>
       }
     >
-      <div className="entry-sheet__body">
+      <div className="entry-sheet__content">
         <EntryForm record={record} draft={draft} onChange={setDraft} />
         <History entry={entry} />
       </div>

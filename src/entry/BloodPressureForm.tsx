@@ -12,6 +12,9 @@
  * the missing mean would be the app inventing a clinical value, and requiring it would mean typing
  * a number nobody measured. `nicht gemessen` is the honest third option.
  *
+ * It is laid out like every other entry sheet: the number and the keypad on the left, what the
+ * entry says about itself — which of the three pressures were measured, and when — on the right.
+ *
  * There is one keypad, not three. Three keypads do not fit on an iPad, and they would be answering
  * a question the sheet never asks: the three numbers are typed one after another, never at once.
  * So the rows are the selection — tapping a number says "this is the one I am typing" — and the
@@ -103,48 +106,58 @@ export function BloodPressureForm({ record, draft, onChange }: BloodPressureForm
     write(nudge(value, direction, meta))
   }
 
+  const type = (event: React.KeyboardEvent) => handleKey(event, press, step)
+
   return (
-    <>
-      <div className="pressure" onKeyDown={(event) => handleKey(event, press, step)}>
+    <div className="entry-form">
+      {/* The same left column the single-value sheet has: the number, and the keys that type it.
+          Typing is caught here and on the rows, which are the only two places the focus can be
+          while a pressure is being entered — and deliberately not on the time controls, where a
+          digit is not a value. */}
+      <div className="entry-form__value" onKeyDown={type}>
         {/* The reading in the notation it is written and spoken in, so what the sheet is about to
             store looks like what a monitor shows and what a protocol records. */}
-        <output className="pressure__reading">
+        <output className="value-field__readout value-field__readout--sole">
           <span className="pressure__notation">{notation(draft)}</span>
-          <span className="pressure__unit">mmHg</span>
+          <span className="value-field__unit">mmHg</span>
         </output>
-
-        {BLOOD_PRESSURE_KINDS.map((kind) => (
-          <PressureRow
-            key={kind}
-            kind={kind}
-            reading={draft.readings[kind]}
-            selected={kind === selected}
-            ref={kind === 'bloodPressureSystolic' ? first : undefined}
-            // Only the selected row can be mid-way through being typed, so it is the only one that
-            // shows digits rather than the number the draft holds.
-            text={kind === selected ? digitsText(digits, value, meta) : null}
-            onSelect={() => select(kind)}
-            onMeasured={(measured) => setReading(kind, { measured })}
-          />
-        ))}
-
-        <p className="pressure__target">
-          Eingabe: <strong>{VITALS[selected].label}</strong>
-        </p>
 
         <Keypad amount={meta} onKey={press} onStep={step} />
       </div>
 
-      {/* One time for all three. It is the whole reason this is one sheet: the shared timestamp is
-          what makes them one reading rather than three that landed near each other. */}
-      <TimeField
-        caption="Zeitpunkt"
-        at={draft.at}
-        min={record.startedAt}
-        now={caseNow(record)}
-        onChange={(at) => onChange({ ...draft, at })}
-      />
-    </>
+      <div className="entry-form__meta">
+        <div className="pressure-rows" onKeyDown={type}>
+          {BLOOD_PRESSURE_KINDS.map((kind) => (
+            <PressureRow
+              key={kind}
+              kind={kind}
+              reading={draft.readings[kind]}
+              selected={kind === selected}
+              ref={kind === 'bloodPressureSystolic' ? first : undefined}
+              // Only the selected row can be mid-way through being typed, so it is the only one
+              // that shows digits rather than the number the draft holds.
+              text={kind === selected ? digitsText(digits, value, meta) : null}
+              onSelect={() => select(kind)}
+              onMeasured={(measured) => setReading(kind, { measured })}
+            />
+          ))}
+
+          <p className="pressure__target">
+            Eingabe: <strong>{VITALS[selected].label}</strong>
+          </p>
+        </div>
+
+        {/* One time for all three. It is the whole reason this is one sheet: the shared timestamp
+            is what makes them one reading rather than three that landed near each other. */}
+        <TimeField
+          caption="Zeitpunkt"
+          at={draft.at}
+          min={record.startedAt}
+          now={caseNow(record)}
+          onChange={(at) => onChange({ ...draft, at })}
+        />
+      </div>
+    </div>
   )
 }
 
