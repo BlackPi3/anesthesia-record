@@ -15,7 +15,9 @@ test.beforeEach(async ({ page }) => {
 test('shows the case header with the demo patient', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Mustermann, Erika' })).toBeVisible()
   await expect(page.getByText('Arthroskopie rechtes Knie')).toBeVisible()
-  await expect(page.getByText('Demodaten')).toBeVisible()
+  // Exact, because „Demodaten zurücksetzen“ on the reset button also contains the word and a
+  // substring match resolves to both.
+  await expect(page.getByText('Demodaten', { exact: true })).toBeVisible()
   await expect(page.getByText('12.08.2026')).toBeVisible()
 })
 
