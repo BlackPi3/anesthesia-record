@@ -44,6 +44,22 @@ describe('placeValueLabels', () => {
     expect(tops.size).toBe(1)
   })
 
+  /**
+   * The same label on a real coordinate. Positions come out of the scales as fractions, and the
+   * box's own area then differs from the area it shares with the lane by a few femto-pixels rather
+   * than by nothing — in both directions, depending on the fraction. The search keeps the strictly
+   * cheapest candidate, so that noise was enough to hand a label with eight free positions the
+   * eighth of them: this one landed below and to the left of its point instead of above it, for no
+   * reason that exists in the geometry. On a lane where every point is fractional, every label
+   * went somewhere arbitrary and the series lost the shared row that makes it readable.
+   */
+  it('puts a lone label above its point on fractional coordinates too', () => {
+    const [placed] = placeValueLabels([label('a', 242.15, 50.4)], [], BOUNDS)
+
+    expect(placed.x + placed.width / 2).toBeCloseTo(242.15)
+    expect(placed.y + placed.height).toBeLessThan(50.4)
+  })
+
   it('never overlaps two labels of one blood pressure measurement', () => {
     // Three pressures on one timestamp, as close together as the demo case puts them.
     const measurement = [label('sys', 500, 30), label('mean', 500, 51), label('dia', 500, 62)]

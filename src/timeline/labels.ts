@@ -98,10 +98,27 @@ export function overlapArea(a: Box, b: Box): number {
   return width > 0 && height > 0 ? width * height : 0
 }
 
+/**
+ * Below this many square pixels a score is rounding, not a collision. A label hiding less than one
+ * square pixel of anything is hiding no digit of it.
+ *
+ * This is what makes "free" mean free. `outside` is the box's own area minus the area it shares
+ * with the lane, and the two are summed from different orderings of the same scaled coordinates,
+ * so a box comfortably inside the lane subtracts to about −2.6e−12 or +5.1e−13 rather than to
+ * zero. `placeValueLabels` stops at the first candidate scoring exactly zero and otherwise keeps
+ * the strictly cheapest one, so without this the last bit of a float decided placement: a later
+ * position that happened to round negative displaced an earlier one that happened to round
+ * positive, and the preference order — the only thing that keeps a series of labels on one shared
+ * row — stopped applying at all. Every label on a dense lane fell to a side position, each one
+ * pushing its neighbour further, until two of them collided.
+ */
+const NOISE = 1
+
 function cost(box: Box, blocked: readonly Box[], bounds: Box): number {
-  const outside = box.width * box.height - overlapArea(box, bounds)
+  const outside = Math.max(0, box.width * box.height - overlapArea(box, bounds))
   const hidden = blocked.reduce((total, other) => total + overlapArea(box, other), 0)
-  return hidden + outside * OUT_OF_BOUNDS_WEIGHT
+  const total = hidden + outside * OUT_OF_BOUNDS_WEIGHT
+  return total < NOISE ? 0 : total
 }
 
 /**
