@@ -105,7 +105,8 @@ test('the three pressures of a reading share one box, in marker order', async ({
   expect(await numbers.count()).toBe((await readings.count()) * 3)
 
   // Scoped inside one box, which is what says these three numbers are one reading. Highest first,
-  // matching the markers beside them — systolic points up, diastolic points down.
+  // matching the markers beside them: the systolic chevron's apex is the topmost point of the
+  // reading, the diastolic chevron's apex the bottom one, and the mean's dot sits between them.
   const lines = await readings.first().locator('[data-value-label]').allTextContents()
   const values = lines.map(Number)
 

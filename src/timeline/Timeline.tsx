@@ -181,8 +181,25 @@ const LABEL_PADDING = 6
  * the surface colour, and a triangle's apex carries its stroke out past the point itself. Measured
  * from what the browser reports rather than from the path, because the search is only as good as
  * its idea of what is already on the chart.
+ *
+ * It is the box of a mark centred on its point, which every mark was until the pressure chevrons
+ * stopped being. Theirs is the same width and the same height and is not centred; `markerBox`
+ * shifts it, and this stays the size.
  */
 const MARKER_BOX = 20
+/**
+ * The chevrons of a blood pressure reading, and the dot between them.
+ *
+ * The height is the old marker's, unchanged: what moved is where the point sits in it, from
+ * somewhere inside the triangle to the apex. The half-width is a little wider than the old 5.5,
+ * because a triangle read from its apex needs a base broad enough to say which way it points, and
+ * these two now differ only in that.
+ */
+const CHEVRON_HEIGHT = 10
+const CHEVRON_HALF_WIDTH = 6
+const MEAN_DOT = 3
+/** The stem between them: narrower than the trace weight, so a reading reads as a mark, not a bar. */
+const STEM_WIDTH = 1.5
 
 function labelWidth(text: string): number {
   return text.length * LABEL_CHAR_WIDTH + LABEL_PADDING * 2
@@ -1055,20 +1072,68 @@ function Marker({
     )
   }
 
+  /**
+   * The paired chevrons of the paper protocol. The apex is the measurement: systolic points down
+   * at its value and diastolic points up at its value, so each triangle's body sits outside the
+   * pair and the span between the two apexes is the pulse pressure, left empty for the stem to
+   * run through.
+   *
+   * They used to point the other way, bodies filling into the span, and that was wrong twice over.
+   * The value was at no vertex — it sat somewhere inside the triangle, so nothing on the mark said
+   * which pixel was the number — and the two bodies ate about ten pixels of the gap they were
+   * meant to be measuring, which made every pulse pressure look narrower than it was.
+   */
   if (kind === 'bloodPressureSystolic') {
-    return <path d={`M ${x} ${y - 6} L ${x + 5.5} ${y + 4} L ${x - 5.5} ${y + 4} Z`} {...shared} />
+    return <path d={chevron(x, y, 'down')} {...shared} />
   }
   if (kind === 'bloodPressureDiastolic') {
-    return <path d={`M ${x} ${y + 6} L ${x + 5.5} ${y - 4} L ${x - 5.5} ${y - 4} Z`} {...shared} />
+    return <path d={chevron(x, y, 'up')} {...shared} />
+  }
+  /**
+   * The mean is a small dot on the stem, and small is the whole of what it says. At the heart
+   * rate's 4.5 it wore that lane's marker one band away from it, so the loudest mark in a pressure
+   * reading was the one number of the three that is read least. Between two chevrons and on their
+   * stem, three pixels is legible and stays subordinate to them.
+   */
+  if (kind === 'bloodPressureMean') {
+    return <circle cx={x} cy={y} r={MEAN_DOT} {...shared} />
   }
   return <circle cx={x} cy={y} r={4.5} {...shared} />
 }
 
-/** What a marker covers, so no other point's label is written over it. */
+/**
+ * Which way a chevron's body hangs off its apex, as a share of the marker box. Every other mark is
+ * centred on its point and is absent from here.
+ */
+const CHEVRON_HANG: Partial<Record<VitalKind, number>> = {
+  bloodPressureSystolic: -MARKER_BOX / 2,
+  bloodPressureDiastolic: MARKER_BOX / 2,
+}
+
+/** A triangle whose apex is the measurement and whose body hangs away from it. */
+function chevron(x: number, y: number, apex: 'up' | 'down'): string {
+  const base = apex === 'down' ? y - CHEVRON_HEIGHT : y + CHEVRON_HEIGHT
+  return `M ${x} ${y} L ${x + CHEVRON_HALF_WIDTH} ${base} L ${x - CHEVRON_HALF_WIDTH} ${base} Z`
+}
+
+/**
+ * What a marker covers, so no other point's label is written over it.
+ *
+ * A chevron hangs off its point rather than surrounding it, so its box is offset by half its own
+ * height in the direction the body goes: a systolic triangle occupies the space *above* its
+ * value and none below it. Written out rather than left as a centred box, because the label
+ * search is only as good as its idea of what is already drawn — a centred box would reserve ten
+ * pixels of empty lane under every systolic reading, which is precisely where the diastolic
+ * label wants to go.
+ *
+ * An off-scale point keeps the centred box: it is drawn as an arrowhead about its own position.
+ */
 function markerBox(point: LanePoint): Box {
+  const hang = point.offScale === null ? (CHEVRON_HANG[point.kind] ?? 0) : 0
+
   return {
     x: point.x - MARKER_BOX / 2,
-    y: point.y - MARKER_BOX / 2,
+    y: point.y - MARKER_BOX / 2 + hang,
     width: MARKER_BOX,
     height: MARKER_BOX,
   }
@@ -1473,7 +1538,18 @@ function readings(points: readonly LanePoint[]): LanePoint[][] {
   return groups.map((group) => [...group].sort((a, b) => a.y - b.y))
 }
 
-/** The vertical stroke joining systolic to diastolic, as drawn on a paper protocol. */
+/**
+ * The stem joining systolic to diastolic, as drawn on a paper protocol.
+ *
+ * It runs apex to apex, which needed no arithmetic once the chevrons' apexes became their values:
+ * both ends are already the point's own `y`. Thin and at full strength rather than thick and
+ * faded — at 2px and 0.55 it was quieter than every line crossing it, so the one mark that says
+ * "these two numbers are one inflation of one cuff" was the one nobody could see. A hairline that
+ * is actually there reads as structure; a wide grey one reads as a smudge.
+ *
+ * Drawn between the two points wherever they are, not vertically, because a corrected point no
+ * longer shares its reading's timestamp to the millisecond and the pair must not come apart.
+ */
 function BloodPressureConnectors({
   readings: grouped,
   color,
@@ -1496,8 +1572,7 @@ function BloodPressureConnectors({
             y1={high.y}
             y2={low.y}
             stroke={color}
-            strokeWidth={2}
-            opacity={0.55}
+            strokeWidth={STEM_WIDTH}
           />
         )
       })}

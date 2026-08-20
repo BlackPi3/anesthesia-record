@@ -1034,9 +1034,62 @@ now a way to test something other than what the config says.
 
 ---
 
+## 2026-08-20 — Blood pressure as paired chevrons, apex at the value
+
+**What:** on the pressure lane, systolic is a filled triangle with its apex pointing **down** and
+sitting exactly on the value, diastolic a triangle with its apex pointing **up** on its value, the
+two joined apex to apex by a 1.5px stem at full strength, and the mean a 3px dot on that stem.
+`markerBox` now offsets a chevron's footprint by half its height, because a chevron hangs off its
+point rather than surrounding it.
+
+**Why:** this is the symbol every anesthesiologist already reads off the paper protocol, and it is
+the one item on the conversion list where `DESIGN.md` describes a mark this app was drawing
+backwards. Both triangles used to point outward, and that was wrong in two ways that only show up
+once you ask which pixel is the number:
+
+- **The value was at no vertex.** The old systolic path put its apex 6px above the point and its
+  base 4px below, so the measurement sat somewhere in the triangle's interior with nothing on the
+  mark to say where. The apex is a point, and a point is what a value wants. Now the two are the
+  same pixel, which is also why the stem needed no arithmetic: both its ends are already a point's
+  own `y`.
+- **The bodies ate the span they were measuring.** Pointing inward, the two triangles filled about
+  ten pixels of the gap between systolic and diastolic. That gap is the pulse pressure. Turning
+  them around empties it and leaves it for the stem.
+
+**The stem is thin and solid rather than thick and faded.** It was 2px at 0.55 opacity, which made
+it quieter than every trend line crossing it: the one mark that says *these numbers are one
+inflation of one cuff* was the one you could not see. A hairline that is actually there reads as
+structure; a wide grey one reads as a smudge.
+
+**The mean is small, and small is the whole of what it says.** At the old r=4.5 it wore the heart
+rate lane's marker one band away from it, so the loudest of a reading's three marks was the number
+read least. Same argument as the medication band's bolus tick, and the third time it has come up.
+
+**One thing this improved that was not the point of it.** An off-scale value is drawn hollow as an
+arrowhead pointing the way it went, so an off-scale systolic at the ceiling is a hollow apex-up
+triangle. The on-scale systolic beside it used to be a *filled* apex-up triangle — same direction,
+distinguished by fill alone. It now points the other way, so near an edge the two differ in
+direction as well.
+
+**Not decided here:** whether the pressure lane should keep its three trend polylines at all.
+`DESIGN.md`'s symbol table gives SpO₂ a polyline explicitly and gives pressure only the chevrons
+and the stem, so the omission looks deliberate — and three parallel lines are three times the ink
+of any other lane, on the lane that already carries the most marks. Rendered both ways and put to
+Parham with the screenshots; it belongs with the open question below about a band, which is the
+same question asked a third way.
+
+**No test fallout.** Nothing asserts a marker's path — the suite keys on `data-entry-id`, on
+`data-value-label` and on bounding boxes, all of which survive. One comment in `values.spec.ts`
+said "systolic points up, diastolic points down" and is now false; rewritten. All four checks
+green: 99 unit tests, 237 Playwright runs.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
-  entries sharing the timestamp the user set; the chart draws them as three markers joined by the
-  systolic–diastolic stroke and labelled as one box. What is still open is whether the *trend*
-  reading of that lane should join the three series into a band rather than three separate lines.
+  entries sharing the timestamp the user set; the chart draws them as paired chevrons on one stem
+  and labels them as one box. What is still open is what the *trend* reading of that lane should
+  do with the three series — join them into a band, leave them as three separate polylines, or
+  drop the polylines and let each reading stand as its own mark, which is what `DESIGN.md`'s
+  symbol table implies. Both of the last two are rendered in this session's screenshots.
