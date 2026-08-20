@@ -754,8 +754,14 @@ cover the fourth lane the brief makes mandatory. Muted violet was chosen over a 
 near `--ink-muted` at a 2px stroke) and over leaving the lane grey (which draws a mandatory
 parameter as chrome).
 
-**Page and card share one ground.** They were previously `#f9f9f7` and `#fcfcfb`, about 1.5% apart
-in luminance — not a difference anyone can see, and the borders were already doing the separating.
+**Page, card and entry sheet share one ground.** The first two were previously `#f9f9f7` and
+`#fcfcfb`, about 1.5% apart in luminance — not a difference anyone can see, and the borders were
+already doing the separating. The sheet needed `colorBgElevated` set explicitly: AntD derives that
+token rather than taking it from `colorBgContainer`, so the drawer stayed at pure white while
+everything inside it wore `--paper`, and the drug tiles read as dirty patches on a clean sheet.
+Caught by opening the sheet and looking at it, which is the only way it was ever going to be
+caught — the old palette had the same bug and hid it, because `#fcfcfb` tiles on white are a gap
+nobody can see.
 
 **On the 7:1 target.** The specification asks 7:1 of "anything numeric". `--ink` is 17.1:1 and
 carries every value and dose, so that is met where it matters. `--ink-muted` is 5.7:1 on axis

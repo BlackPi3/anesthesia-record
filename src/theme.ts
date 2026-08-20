@@ -48,6 +48,10 @@ export const antdTheme: ThemeConfig = {
     colorInfo: '#2f4b7c',
     colorBgLayout: '#fbfaf8',
     colorBgContainer: '#fbfaf8',
+    // Also the entry sheet. AntD derives this one rather than taking it from the container, so
+    // leaving it out left the drawer at pure white while everything in it wore `--paper` — which
+    // made the drug tiles read as dirty patches on a clean sheet instead of as raised keys.
+    colorBgElevated: '#fbfaf8',
     colorText: '#14181c',
     // Two inks, so AntD's third level collapses onto the second rather than inventing a grey.
     colorTextSecondary: '#5c6470',

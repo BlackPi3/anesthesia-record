@@ -707,8 +707,8 @@ body {
 
 /*
  * The readout over a selected point, which is also the button into that entry's sheet. The box is
- * dark on a white chart, so its focus ring is drawn as a light stroke on the box itself as well as
- * an outline: an outline alone would sit on the surface behind it and read as part of the lane.
+ * dark against `--paper`, so its focus ring is drawn as a light stroke on the box itself as well
+ * as an outline: an outline alone would sit on the ground behind it and read as part of the lane.
  * The inline opacity is a presentation attribute, which is why raising it here wins over it.
  */
 .timeline__readout {
