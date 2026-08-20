@@ -119,7 +119,11 @@ stepping through the ticks. `--grid-major` is also the lane separator, and it is
 chrome: nothing that is not data may be darker.
 
 **Lane colours never carry identity on their own.** Every lane has a permanent visible text label,
-which is what allows two of the four colours to sit below 3:1 contrast. Do not remove those labels.
+and the Blutdruck lane tells its three pressures apart by marker shape. Do not remove either. This
+was originally a contrast concession — two of the four traces sat below 3:1 — and it is not one any
+more: since the six-value palette the four run 5.95:1 to 7.80:1 against the ground, as `theme.ts`
+records. The labels stay regardless, because a hue being legible is not a reason to make it carry a
+name.
 
 **The rail on the right is each lane's current value, and it is the newest measurement or nothing.**
 Not the selection — a selected point has its own readout — and never clamped to the axis. It says

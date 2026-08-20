@@ -53,16 +53,17 @@ Everything the record holds can be written, corrected and removed, and the case 
 - **The audit trail** is kept on every entry and shown in the sheet, in front of whoever is about
   to correct the entry again.
 - **Undo** takes back the last change, from the header or with `Ctrl`/`Cmd`+`Z`.
-- **Saving** is immediate and confirmed in the header. A record with nothing in it says so.
+- **Saving** is immediate and confirmed in the header. A record with nothing in it says so, and a
+  stored case this version cannot read offers to be discarded rather than leaving the app with no
+  way forward.
 
 The domain layer holds the case and entry types, the vital/event catalogue with its German labels
 and ranges, the local-storage persistence layer, and a fictional demo case.
 
-92 unit tests cover the domain layer, the keypad's typing rules, and the timeline's coordinate and
-label-placement maths. 79 Playwright tests run across desktop Chrome, an iPad-sized viewport with
-touch, and WebKit — 232 runs in all.
-
-This README grows alongside the build; sections appear as the thing they describe does.
+99 unit tests cover the domain layer, the keypad's typing rules, and the timeline's coordinate and
+label-placement maths. 90 Playwright tests run across desktop Chrome, an iPad-sized viewport with
+touch, and WebKit — 265 runs in all, of which 10 are skipped by design: the stories are recorded
+once on Chromium, and the touch gestures can only be driven there.
 
 ## Data model
 
@@ -95,7 +96,12 @@ be documented, and the gap between them is what the off-scale mark is for.
 
 `src/domain/storage.ts` is the only file that touches `localStorage`. Load and save return result
 unions rather than throwing, so every caller has to handle the failure cases that local storage
-really produces, and the load outcomes map directly onto the empty and error states in the UI.
+really produces, and the load outcomes map directly onto the empty and error states in the UI. A
+load failure also says which kind it is: `access` is the browser refusing the API, where nothing
+done to the stored value can help, and `content` is the key holding bytes this version cannot read,
+where discarding them ends the failure. That is what lets the error screen offer a way out of the
+second and honest advice for the first, instead of telling everyone to reload — which for unreadable
+data reads the same bytes and fails identically, forever.
 
 **Demo data is fictional**, in `src/domain/demoCase.ts`: a placeholder patient (Erika Mustermann)
 and invented values, with fixed timestamps so the chart, the screenshots, and the tests all see
@@ -119,8 +125,11 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
   timestamp, because a cuff inflates once and reports all three. Each of the three can be switched
   off for a manual cuff, which gives no mean. They are still *stored* as three ordinary vital
   entries, so correcting one afterwards touches only that one.
-- **5-minute gridlines** on the timeline are a visual/clinical reference (matching how vitals are
-  conventionally charted), not a constraint — entries can land at any exact time.
+- **The time grid is two weights** — a hairline every five minutes, a rule every fifteen, and only
+  the fifteens are labelled. It is a visual and clinical reference, matching how vitals are
+  conventionally charted, not a constraint: entries can land at any exact time. Both bands are
+  ruled from the same window and the same plot edges as the lanes, because a dose with no time
+  under it is not on a shared timeline.
 - **Local persistence only**, no backend — a mandatory constraint from the challenge brief, and
   also the right scope for what's being evaluated here.
 
@@ -177,10 +186,12 @@ nearer one marker than the other two, so a label per point could only be guessed
 guess changed from reading to reading.
 
 Colours are the four categorical slots in fixed order, one per lane, validated for colour-vision
-separation against the surface. Two of them fall below 3:1 contrast, so identity never rests on
-hue: every lane carries a permanent text label, and within the Blutdruck lane the three pressures
-are told apart by marker shape (systolic points up, diastolic down, the mean is a dot) as on the
-paper protocol.
+separation against the surface. As graphics rather than text the floor that binds them is 3:1, and
+they run 5.95:1 (heart rate) to 7.80:1 (blood pressure), so all four clear it. Identity still never
+rests on hue: every lane carries a permanent text label, and within the Blutdruck lane the three
+pressures are told apart by marker shape (systolic points up, diastolic down, the mean is a dot) as
+on the paper protocol. That is no longer a contrast concession — it is how a clinician reads a
+protocol, and a hue being legible is not a reason to make it carry a name.
 
 ## Entering a value
 
@@ -198,14 +209,15 @@ start and an end — inside an iPad in landscape. Every part of the drawer is na
 `classNames` in [`src/entry/sheet.ts`](src/entry/sheet.ts); the reason that matters is in
 `docs/learning.md`.
 
-The value field is a large readout above a keypad, framed together as one plate. The number is typed: whoever is filling this in
-is reading 133 off a monitor and already knows the value, so the shortest path from what they know
-to what the record holds is three digits — and typing is exact by construction, which no gesture on
-these axes is. The keypad is in the sheet rather than the system's, because the sheet is a drawer at
-the bottom of the screen, which is exactly where an iPad's keyboard opens: a focused text input
-would cover the form it belongs to. On a desktop the sheet hands its focus to the readout, so the
-number is typed the moment the sheet appears; `−` and `+` (and the arrow keys) move an entered value
-by the metric's step, which is what most corrections need.
+The value field is a large readout above a keypad, framed together as one plate. The number is
+typed: whoever is filling this in is reading 133 off a monitor and already knows the value, so the
+shortest path from what they know to what the record holds is three digits — and typing is exact by
+construction, which no gesture on these axes is. The keypad is in the sheet rather than the
+system's, because the sheet is a drawer at the bottom of the screen, which is exactly where an
+iPad's keyboard opens: a focused text input would cover the form it belongs to. On a desktop the
+sheet hands its focus to the readout, so the number is typed the moment the sheet appears; `−` and
+`+` (and the arrow keys) move an entered value by the metric's step, which is what most corrections
+need.
 
 The typing rules live in [`src/entry/digits.ts`](src/entry/digits.ts) as plain functions, tested
 with strings and numbers: the first digit replaces the value the sheet opened on, a digit that would
@@ -250,9 +262,15 @@ the component/form system.
 npm run build     # typecheck and production build
 npm run lint
 npm test          # Vitest unit tests
-npm run e2e       # Playwright, starts the dev server itself
+npm run e2e       # Playwright: builds dist and serves it, not the dev server
 npm run videos    # re-records the user-story videos in docs/videos/
 ```
+
+`npm run e2e` tests the built artifact. It runs `npm run build` and serves `dist`, because Safari
+on an iPad is given `dist` and a font that arrives in dev is not evidence about the one that ships
+— under the suite's own parallel load the dev server was in fact leaving font requests unanswered,
+and everything measured against those metrics was measuring the platform's fallback. Anything that
+only works with HMR or with unbundled modules will not be seen by these tests.
 
 Playwright runs three projects: desktop Chrome, an iPad-sized viewport with touch, and the same
 iPad viewport under WebKit, the engine Safari uses. Video is recorded for the four user stories and
@@ -268,10 +286,18 @@ replace.
 
 ## Trying it on an iPad
 
-Pushing to `main` builds the app and publishes it to GitHub Pages, which gives a link that opens on
-any device. It exists for one reason: the touch and stylus handling was written for Safari on an
-iPad, and emulation cannot confirm it. It is a preview link for testing on hardware, not a
-deployment — the completeness and deployment part of the brief is out of scope and stays that way.
+**<https://blackpi3.github.io/anesthesia-record/>**
+
+Pushing to `main` builds the app and publishes it there. It exists for one reason: the touch and
+stylus handling was written for Safari on an iPad, and emulation cannot confirm it. It is a preview
+link for testing on hardware, not a deployment — the completeness and deployment part of the brief
+is out of scope and stays that way.
+
+The workflow had been failing on every run since it was added, with *"Ensure GitHub Pages has been
+enabled"*: the build was fine and the deploy 404'd, and nothing said so on the way past. Pages was
+enabled on the repository on 20 August and the run re-run, and the link has served the current
+build since. It is recorded here rather than quietly fixed because this README asserted the link
+worked for as long as it did not, which is the more useful thing to have written down.
 
 Everything is stored in the browser it runs in, so each person who opens the link gets their own
 copy of the demo case and nothing is shared between them. „Demodaten zurücksetzen“ in the header
@@ -297,7 +323,65 @@ being filmed.
 
 ## Agent usage
 
-This project is built in collaboration with Claude Code, used deliberately as a design and
-implementation partner rather than a generator: architectural decisions (data model, timeline
-interaction, framework choice) are discussed and decided here, not made silently by the agent.
-Representative work loops will be documented as the build progresses.
+This project was built in collaboration with Claude Code, used deliberately as a design and
+implementation partner rather than a generator: architectural decisions — the data model, the
+timeline interaction, the framework choice — were discussed and decided by hand, not made silently
+by the agent.
+
+What that looked like in practice:
+
+- **[`CLAUDE.md`](CLAUDE.md) is the working contract**, and it grew by correction. Nearly every rule
+  in it is a mistake folded back in after it was made, which is why it reads as specifically as it
+  does: verify by looking rather than by reading, a green test can prove nothing, `Date.now()` is an
+  input, keep return types narrow, no side effects in a state updater.
+- **[`docs/decisions.md`](docs/decisions.md) records the reasoning**, including what was rejected
+  and why. Several entries supersede earlier ones in place, so a decision that turned out wrong is
+  visible as a decision that turned out wrong rather than being quietly overwritten.
+- **[`docs/learning.md`](docs/learning.md)** holds the bugs whose cause was not obvious — the ones
+  where the change that revealed the fault was not the change that caused it.
+- **The standing rule was to present options, not to pick.** Anything hard to reverse came back as
+  a recommendation with trade-offs and waited. The gutter width in the section below is one that is
+  still waiting.
+- **The failure mode worth naming** is agreeable-looking code that nobody can explain. Coordinate
+  maths is where it hides, so `scales.ts` and `labels.ts` are pure functions tested with numbers,
+  and the timeline is checked by interacting with it and screenshotting both form factors rather
+  than by reading the handler.
+
+## Known limitations
+
+Scope decisions, with the reason each one was made.
+
+- **The time axis fits the case to the width available**, rather than holding a fixed number of
+  pixels per minute. As a case grows the chart compresses, so an hour late in a long case is
+  narrower than an hour early in a short one. `DESIGN.md` asks for a fixed scale and it is the
+  right answer — the value axes were fixed on exactly that argument, so the app is currently
+  inconsistent with itself. It is not built because it is about a day's work and it moves the
+  `touch-action` handling under the hold-to-drag gesture, which has shipped broken once already.
+  Trading a known compression for a chance of silently rewriting a value on scroll was not worth
+  it in the time left. The sequence it would be built in is written down in `docs/decisions.md`.
+- **Part 3 of the brief — the completeness check and deployment — is not built.** Decided on
+  16 August: two solid parts beat three thin ones. The Pages link above is a hardware test link and
+  is not that deployment.
+- **One case, in one browser.** No backend is a constraint of the brief, and the app takes it
+  literally: the record lives in `localStorage` on the device that wrote it, there is no second
+  case, and nothing is shared between two people opening the same link. Everything that touches
+  storage is behind four functions in one file, so a backend would be a change to that file.
+- **Stored data is checked by a hand-written type guard**, not a schema validator. It covers the
+  failure that actually happens — the key holding something that is not a case at all — and stops
+  there. A validator such as zod is the right answer for a format that outlives the code and is the
+  natural next step if the model grows.
+- **Undo goes back 25 steps and there is no redo.** Undo is for the slip just made; it is
+  deliberately not persisted, because a reload is where the record stands as documented. Redo is a
+  different feature, and `Shift`+`Ctrl`/`Cmd`+`Z` does nothing rather than undoing by accident.
+- **Nothing is calculated and nothing is recommended.** The brief forbids it. MAD is read off the
+  monitor and entered, never derived from the systolic and diastolic already in the record, even
+  though the arithmetic is trivial and the two numbers are right there.
+- **Verification on physical iPad hardware is a separate step** that emulation does not replace.
+  The WebKit project runs the suite in the engine Safari uses, at an iPad viewport, with touch —
+  which is the closest a machine can get and is not the same thing as a finger on glass.
+- **Two things are still open.** The left gutter is 168px, sized so „Sauerstoffsättigung“ clears the
+  axis numbers; narrowing it to 100px would buy about 68px of chart on an iPad but needs the lane
+  name to go somewhere else first, and where is a design decision that has not been made. And the
+  blood pressure lane still draws three trend polylines, where the symbol table implies each
+  reading should stand as its own paired chevrons. Both are recorded in `docs/decisions.md` under
+  open decisions rather than settled quietly.
