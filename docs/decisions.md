@@ -839,6 +839,70 @@ here would have set the type size twice.
 
 ---
 
+## 2026-08-20 — The current value of each lane, in a rail to the right of the chart
+
+**What:** every lane carries its newest measurement at 32px in a fixed 136px column outside the
+plot, right-aligned and centred on the lane, with the unit and „zuletzt HH:MM“ under it in the
+small type. The pressure lane shows `133/80` with `MAD 98` beneath. The plot's right edge moved in
+by that column, and every band moved with it.
+
+**Why:** measured off a screenshot, the largest text on the page was the patient's name and no
+measured value was legible at all without switching the whole chart into its numbers mode — which
+is something you do to read the record, not something you should have to do to read the patient.
+This is the item that makes the page read as a clinical display rather than as four charts.
+
+**It is outside the plot, not drawn on it.** Put at the lane's top right, a readout has to be moved
+out of the data's way — a saturation of 100 and a hypertensive systolic both live exactly there —
+and a number that is not in the same place twice is a number you have to look for. Put in the left
+gutter instead it costs no plot width but adds roughly 14px of height to every lane, and the
+vertical budget is what fills an iPad screen. Put to Parham on 2026-08-20 with all three drawn out;
+he chose the rail, which is also where a Dräger or a Philips monitor puts it.
+
+**Every band takes the same right edge, not only the lanes.** The bands carry no readout and the
+column is empty beneath them, which is real medication width given away. One time scale across the
+whole canvas is what this chart is for, and a band drawn 136px wider than the lanes above it would
+put a dose at one x and the vitals of that minute at another.
+
+**In `--ink`, not in the lane's colour.** These are the largest numbers on the page, and
+`DESIGN.md` asks 7:1 of anything numeric — which `--ink` clears at 17.1:1 and the four traces do
+not, running 5.95:1 to 7.80:1 on a graphics floor rather than a numeric one. The lane's permanent
+label and its trace already say which parameter this is, and four large numbers in four colours
+would take the boldness off the canvas, where the symbols are, and put it in the margin.
+
+**It says „zuletzt“ and it says when.** A large bare number beside a live-looking trace asserts
+that it is what the patient is doing now. This app is a record: nothing polls a device, and the
+number is the last value somebody wrote down. Nothing is derived either — a pressure reading whose
+mean has been removed prints the pair and drops the MAD line rather than computing one.
+
+**It follows a drag but never a selection.** Selecting a point already opens that point's own
+readout with the unit and the time, which is where a value from earlier in the case is read. If the
+large number followed the selection too, the one number on the lane that is always the same thing
+would stop being that. It does follow a drag of the newest point, because that value is genuinely
+changing.
+
+**The rail is not chart surface, and the toggle now knows it.** A press on empty chart drops the
+trend lines and writes every value out. That handler took a press anywhere on the lane's `<svg>`,
+gutter included, which was already wrong and would have made the largest target on the lane one
+that changes how the whole record reads by accident. It is now bounded to the plot area.
+
+**Mono, tabular, at the platform's own monospace face.** `--font-numeric` in `index.css`, so item 5
+of the conversion list swaps IBM Plex Mono in at one place. 32px sits in the middle of `DESIGN.md`'s
+28–40px and is the largest size the shortest lane holds — Temperatur is 74px, and 32 plus two 15px
+lines leaves a margin at each end. One size across all four: a rail whose numbers are different
+sizes is not a rail.
+
+**The width it cost exposed a defect in the label placer that had nothing to do with it.** Two
+numbers overlapped on iPad in the numbers mode, and the plausible cause was the 136px. It was not:
+`cost` in `labels.ts` subtracted two float sums of the same rectangle, so a free position scored a
+few femto-pixels either side of zero, `if (bestCost === 0) break` never fired, and the comparison
+between two free positions was decided by rounding. The preference order that keeps a series of
+labels on one shared row had not been applying at all, on either form factor. Fixed by treating
+anything under one square pixel as free. Written up in `docs/learning.md`; the regression test
+places one label at a coordinate found by searching for noise that flips the comparison, because
+every existing test used whole pixels, which is the one arithmetic where the bug cannot happen.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored

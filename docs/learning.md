@@ -395,6 +395,54 @@ was that the property had been stated about the wrong object.
 
 ---
 
+## 2026-08-20 — Float noise was deciding where every label went
+
+Adding the current-value rail took 136px off the plot, which pushed the labels of the „Zahlen
+anzeigen“ mode close enough together on an iPad that two of them overlapped. That is a real
+promise broken — `values.spec.ts` asserts that no two numbers are written over each other — so the
+obvious reading was that the rail costs too much width and the answer was to make it narrower.
+
+That reading was wrong, and measuring said so. Logging the cost of all eight candidate positions
+for every label showed this, for a label with nothing anywhere near it:
+
+```
+costs [544, 5.1e-13, 72, 94, 544, 594, -2.6e-12, 37]  chose 6
+```
+
+Three of those positions are free. The first of them — index 1, directly under the point — scores
+`+5.1e-13`; index 6, off to the right, scores `−2.6e-12`. `placeValueLabels` stops at the first
+candidate scoring **exactly** zero and otherwise keeps the strictly cheapest, so neither branch
+did what it was written to do: the break never fired, and the comparison was decided by which way
+a float happened to round. The preference order — the whole reason a series of labels shares one
+row — had not been applying at all.
+
+The noise comes from `cost`, which computes `box.width * box.height - overlapArea(box, bounds)`.
+For a box entirely inside the lane those two are the same rectangle measured two ways, and
+`overlapArea` gets its width as `min(a.x + a.width, b.x + b.width) - max(a.x, b.x)` — a subtraction
+of two large fractional coordinates, where `(186.3 + 28) - 186.3` is not 28. On whole pixels it is
+exact, which is why every unit test passed: `labels.test.ts` placed its points at 200, 280, 360.
+**The tests were written in the one arithmetic where the bug cannot happen.** The fix is to treat
+anything under one square pixel as free — a physical threshold, not a float epsilon, because a
+label hiding less than a square pixel of something is hiding no digit of it.
+
+Three things worth keeping:
+
+- **The first plausible cause was the change I had just made.** The rail did make the symptom
+  visible, and stopping there would have produced a narrower rail, a still-broken placer, and a
+  test that passed for the wrong reason.
+- **A green test proved nothing, again, and for a new reason.** Not because it would pass with the
+  feature deleted, but because its inputs were rounder than any input the app produces. The
+  regression test now places one label at `x = 242.15`, which was found by searching for a
+  coordinate whose noise flips the comparison; it fails without the fix.
+- **`===` against a float is a bug even when it looks like a shortcut.** `if (bestCost === 0)
+  break` reads as an optimisation. It was load-bearing: without it the search has no notion of
+  "good enough", and every free position competes on noise.
+
+Desktop was never asserted on and looked fine, but it had the same defect — the heart rate labels
+alternated above and below the trace for no reason. They sit on one row now.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

@@ -89,7 +89,9 @@ mapping go there with a test, not into the component.
 **The lane surface answers four gestures, each defined by how it ends:** press a point to select,
 hold and drag to correct, press the readout to open its sheet, press empty chart to switch how the
 lane reads. Anything new on that surface must state what the other four must not do, and must be
-proven by a scripted gesture rather than by reading the handler.
+proven by a scripted gesture rather than by reading the handler. **"Empty chart" means the plot,
+not the whole `<svg>`.** The gutter on the left and the value rail on the right are the lane's
+furniture; a press on a parameter's name or on its current value is not a press on the chart.
 
 **Touch requires a deliberate grab.** 250ms hold before a point becomes draggable, released if the
 finger moves more than 10px first. Mouse and pen drag immediately, keyed off
@@ -110,13 +112,25 @@ midpoint and ceiling; `scales.test.ts` asserts this.
 **Lane colours never carry identity on their own.** Every lane has a permanent visible text label,
 which is what allows two of the four colours to sit below 3:1 contrast. Do not remove those labels.
 
+**The rail on the right is each lane's current value, and it is the newest measurement or nothing.**
+Not the selection — a selected point has its own readout — and never clamped to the axis. It says
+„zuletzt“ and the time, because this is a record and not a monitor. It is in `--ink`: it carries
+the largest numerals on the page, and the numeric contrast target binds them where it does not bind
+a trace. Every band shares the plot's right edge with the lanes, so the canvas keeps one time
+scale.
+
 ## Corrections already folded in
 
 - **Verify by looking and interacting, not by reading.** Several layout defects and the touch
   defect were invisible in the source. Screenshot both form factors after any timeline change.
 - **A green test can prove nothing.** Ask what would still pass if the feature were deleted. One
   reload test cleared storage on every navigation and watched the app re-seed, so it would have
-  passed with persistence entirely broken.
+  passed with persistence entirely broken. Ask also whether its **inputs are rounder than the
+  app's**: every `labels.test.ts` case placed points on whole pixels, which is the one arithmetic
+  in which the float bug in `cost` cannot occur.
+- **The cause is not always the change that revealed it.** A regression that appears the moment you
+  touch geometry is usually yours and was twice not. Instrument before narrowing the thing you just
+  built.
 - **A failing test is not the same claim as a broken app.** Removing an animation to satisfy a test
   is letting the test design the product.
 - **`Date.now()` is an input.** Code reading it has a hidden dependency on when it runs. Take `now`

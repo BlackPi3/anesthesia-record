@@ -66,6 +66,25 @@ import {
  */
 const GUTTER = 168
 const RIGHT_PAD = 24
+/**
+ * The right-hand rail holding each lane's current-value readout.
+ *
+ * Outside the plot rather than drawn on it. The top right of a lane is where a saturation of 100
+ * and a hypertensive systolic both live, so a number placed there would have to be moved out of
+ * the data's way — and a readout that is not in the same place twice is a readout you have to look
+ * for. Out here it is aligned with its own trace and can never touch a point.
+ *
+ * Every band takes the same right edge, not only the lanes. The bands carry no readout and the
+ * column is empty beneath them, which costs real medication width; but one time scale across the
+ * whole canvas is what this chart is for, and a band drawn 136px wider than the lanes above it
+ * would put a dose at one x and the vitals of that minute at another.
+ */
+const VALUE_COLUMN = 136
+
+/** The plot's right edge, shared by the time axis, all four lanes and both bands. */
+function plotRight(width: number): number {
+  return width - RIGHT_PAD - VALUE_COLUMN
+}
 /** Vertical inset inside a lane, so a value at the axis limit is not clipped by the edge. */
 const LANE_INSET = 12
 const LANE_BASE_HEIGHT = 92
@@ -173,7 +192,7 @@ export function Timeline({ record, onCorrect, onRemove, onEdit, onAdd }: Timelin
 
   return (
     <div ref={ref} className="timeline">
-      {width > GUTTER + RIGHT_PAD + 80 && (
+      {plotRight(width) > GUTTER + 80 && (
         <>
           {/* The gesture is the fast way in and the button is the discoverable one. A tap on the
               chart is worth having — it is where the eye and the finger already are — but nobody
@@ -307,7 +326,7 @@ function AddButton({
 /** Gridline times, and how often to label them so the axis stays readable when narrow. */
 function useAxisTicks(window: TimeWindow, width: number) {
   const times = gridTimes(window.from, window.to)
-  const plotWidth = width - GUTTER - RIGHT_PAD
+  const plotWidth = plotRight(width) - GUTTER
   // A time label needs roughly 46px to stand clear of its neighbour.
   const every = Math.max(1, Math.ceil((times.length * 46) / Math.max(plotWidth, 1)))
   return { times, labelEvery: every }
@@ -316,7 +335,7 @@ function useAxisTicks(window: TimeWindow, width: number) {
 function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
   const { times, labelEvery } = useAxisTicks(window, width)
   const scale = createLaneScales(
-    { left: GUTTER, right: width - RIGHT_PAD, top: 0, bottom: 0 },
+    { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
     [0, 1],
   ).time
@@ -465,7 +484,7 @@ function VitalLane({
   const height = Math.round(LANE_BASE_HEIGHT * lane.weight)
   const area = {
     left: GUTTER,
-    right: width - RIGHT_PAD,
+    right: plotRight(width),
     top: LANE_INSET,
     bottom: height - LANE_INSET,
   }
@@ -505,6 +524,13 @@ function VitalLane({
   }))
   const points = seriesByKind.flatMap((series) => series.points)
   const active = points.find((point) => point.id === (drag?.id ?? selectedId)) ?? null
+  /**
+   * The reading the lane's large readout shows: the last group `readings` produces, which on a
+   * one-kind lane is simply the newest point and on the pressure lane is the newest systolic,
+   * mean and diastolic taken together. Read off `points` rather than off the record, so a drag of
+   * the newest value is written in the rail as it happens.
+   */
+  const latest = readings(points).at(-1) ?? []
 
   /**
    * What each label covers. Every lane but one labels a point at a time; the blood pressure lane
@@ -689,7 +715,13 @@ function VitalLane({
     // A press on or near a point selected it; that is what the press meant, and this lane keeps
     // the numbers it is showing. Labels sit inside the hit radius of their own point, which makes
     // the number a second, larger target for selecting the point it belongs to.
-    if (hitTest(localPoint(event))) return
+    const at = localPoint(event)
+    if (hitTest(at)) return
+    // Only the chart switches how the lane reads. The gutter and the value rail are the lane's
+    // furniture — a press on the parameter's name, on its entry button or on its current value is
+    // not a press on empty chart, and dropping every line on the lane in answer to one reads as
+    // the app having done something at random.
+    if (at.x < area.left || at.x > area.right) return
 
     onToggleValues()
   }
@@ -889,6 +921,12 @@ function VitalLane({
       {active && <SelectionRing point={active} color={color} grabbed={grabbed} />}
       {active && <Readout point={active} area={area} grabbed={grabbed} onEdit={onEdit} />}
 
+      {/* Always the newest reading, never the selected one. Selecting a point already opens its
+          own readout, with the unit and the time; if the large number followed the selection too,
+          the one number on the lane that is always the same thing would stop being that. It does
+          follow a drag of the newest point, because that point's value is genuinely changing. */}
+      <LaneValue lane={lane} reading={latest} width={width} height={height} />
+
       <line
         x1={area.left}
         x2={area.right}
@@ -1067,6 +1105,162 @@ function SelectionRing({
 function readoutLabel(point: LanePoint): string {
   const meta = VITALS[point.kind]
   return `${meta.short} ${formatValue(point.kind, point.value)} ${meta.unit} · ${formatTime(point.at)}`
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * The readout's type. 32px sits in the middle of `DESIGN.md`'s 28–40px and is the largest size the
+ * shortest lane holds: Temperatur is 74px tall, and 32 plus two 15px lines leaves a margin at each
+ * end. One size across all four, because a rail whose numbers are different sizes is not a rail.
+ */
+const VALUE_SIZE = 32
+const VALUE_NOTE_SIZE = 12
+const VALUE_NOTE_LINE = 15
+
+interface LaneValueText {
+  /** The number, set at `VALUE_SIZE`. An em dash when the lane holds nothing yet. */
+  value: string
+  unit: string
+  /** The lines under the unit, smallest type: the mean pressure where there is one, and the time. */
+  notes: string[]
+  /** The same reading as one sentence, for the lane's screen-reader description. */
+  spoken: string
+}
+
+/**
+ * What one lane's readout says, from the reading it is showing.
+ *
+ * Pure, and given the reading rather than the record, so it stays correct while a point is being
+ * dragged: the caller passes the points as they are currently drawn, and a correction to the newest
+ * value is read here as it is made.
+ */
+function laneValueText(lane: LaneDef, reading: readonly LanePoint[]): LaneValueText {
+  const unit = laneUnit(lane)
+  if (reading.length === 0) {
+    return {
+      value: '—',
+      unit,
+      notes: ['keine Werte'],
+      spoken: `${lane.label}, noch keine Werte erfasst.`,
+    }
+  }
+
+  const at = Math.max(...reading.map((point) => point.at))
+  const time = formatTime(at)
+  const text = (kind: VitalKind) => {
+    const point = reading.find((member) => member.kind === kind)
+    return point ? formatValue(kind, point.value) : null
+  }
+
+  if (lane.id === 'bloodPressure') {
+    const systolic = text('bloodPressureSystolic')
+    const diastolic = text('bloodPressureDiastolic')
+    const mean = text('bloodPressureMean')
+    // A blood pressure is read and spoken as one reading, so the pair is the number and the mean
+    // arterial pressure is the line beneath it. Nothing is filled in when a part is missing: any
+    // of the three can be removed on its own, and MAD is read off the monitor, never computed
+    // from the other two.
+    if (systolic !== null && diastolic !== null) {
+      return {
+        value: `${systolic}/${diastolic}`,
+        unit,
+        notes: mean === null ? [`zuletzt ${time}`] : [`MAD ${mean}`, `zuletzt ${time}`],
+        spoken:
+          `${lane.label}, zuletzt ${systolic} zu ${diastolic} ${unit}` +
+          `${mean === null ? '' : `, Mittlerer arterieller Druck ${mean}`}, um ${time} Uhr.`,
+      }
+    }
+  }
+
+  // One measurement: the lane's own kind, or whichever half of a blood pressure is left after the
+  // others were removed. The short name is printed only where a lane carries more than one kind,
+  // because at this size "104" over "mmHg" does not say which of the three pressures it is, while
+  // "98" over "%" in the lane named Sauerstoffsättigung says it twice.
+  const point = reading[0]
+  const meta = VITALS[point.kind]
+  const value = formatValue(point.kind, point.value)
+  return {
+    value,
+    unit,
+    notes: lane.vitals.length > 1 ? [meta.short, `zuletzt ${time}`] : [`zuletzt ${time}`],
+    spoken: `${lane.label}, zuletzt ${value} ${meta.unit}${
+      lane.vitals.length > 1 ? ` ${meta.label}` : ''
+    }, um ${time} Uhr.`,
+  }
+}
+
+/**
+ * A lane's current-value readout: the newest measurement on that lane, set large. Right-aligned in
+ * the rail and centred on its lane, so each number sits level with the trace it belongs to.
+ *
+ * The reason it exists is that a protocol is a clinical display and this one was not reading as
+ * one. The largest text on the page was the patient's name, and no measured value was legible at
+ * all without switching the whole chart into its numbers mode — which is a thing you do to read
+ * the record, not a thing you should have to do to read the patient.
+ *
+ * It says „zuletzt“, and it says when. This is a record, not a monitor: the number is the last
+ * value somebody wrote down, and a large bare number beside a live-looking trace would assert that
+ * it is what the patient is doing now. Nothing here polls a device and nothing here is derived.
+ *
+ * It is not clamped. A value that fell off its axis is drawn hollow against the edge of the lane,
+ * and this is where its real number is read — the point of keeping off-scale points at all is that
+ * nothing vanishes from a clinical record because of a drawing choice.
+ *
+ * In `--ink` rather than in the lane's colour. It is the largest number on the page and
+ * `DESIGN.md` asks 7:1 of anything numeric, which `--ink` clears at 17.1:1 and the four traces do
+ * not — they run 5.95:1 to 7.80:1, which is a graphics floor, not a numeric one. The lane's own
+ * label and trace already say which parameter this is, and four large numbers in four colours
+ * would take the boldness off the canvas, where the symbols are, and put it in the margin.
+ *
+ * `pointerEvents` is off. The rail is the lane's furniture, not its chart surface: nothing here is
+ * pressed, and the four gestures the lane answers all belong to the plot.
+ */
+function LaneValue({
+  lane,
+  reading,
+  width,
+  height,
+}: {
+  lane: LaneDef
+  reading: readonly LanePoint[]
+  width: number
+  height: number
+}) {
+  const { value, unit, notes, spoken } = laneValueText(lane, reading)
+  const right = width - RIGHT_PAD
+  const block = VALUE_SIZE + (notes.length + 1) * VALUE_NOTE_LINE
+  const top = (height - block) / 2
+  const empty = reading.length === 0
+
+  return (
+    <g role="img" aria-label={spoken} pointerEvents="none">
+      <text
+        className="timeline__value"
+        data-lane-value={lane.id}
+        x={right}
+        y={top + VALUE_SIZE * 0.78}
+        fill={empty ? chart.inkMuted : chart.ink}
+        fontSize={VALUE_SIZE}
+        textAnchor="end"
+      >
+        {value}
+      </text>
+      {[unit, ...notes].map((line, index) => (
+        <text
+          key={index}
+          className="timeline__value-note"
+          x={right}
+          y={top + VALUE_SIZE + (index + 1) * VALUE_NOTE_LINE - 4}
+          fill={chart.inkMuted}
+          fontSize={VALUE_NOTE_SIZE}
+          textAnchor="end"
+        >
+          {line}
+        </text>
+      ))}
+    </g>
+  )
 }
 
 /**
@@ -1306,7 +1500,7 @@ function MedicationBand({
   // protocol can hold — which is more use than four lanes and two loose buttons.
   const height = rows.length * MED_ROW_HEIGHT + 28
   const scale = createLaneScales(
-    { left: GUTTER, right: width - RIGHT_PAD, top: 0, bottom: 0 },
+    { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
     [0, 1],
   ).time
@@ -1338,7 +1532,7 @@ function MedicationBand({
             ? start
             : Math.max(scale.map(entry.endedAt ?? window.to), start + 4)
         // Flip the dose to the left of the mark when it would run off the right edge.
-        const flip = end + 90 > width - RIGHT_PAD
+        const flip = end + 90 > plotRight(width)
 
         const summary =
           entry.type === 'bolus'
@@ -1452,7 +1646,7 @@ function EventBand({
   // Kept when empty for the reason the medication band is: it heads the button below it.
   const height = events.length === 0 ? 24 : 24 + EVENT_ROW_HEIGHT * 2
   const scale = createLaneScales(
-    { left: GUTTER, right: width - RIGHT_PAD, top: 0, bottom: 0 },
+    { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
     [0, 1],
   ).time
@@ -1475,7 +1669,7 @@ function EventBand({
         const y = 30 + row * EVENT_ROW_HEIGHT
         // Milestones near the end of a case (discharge, above all) would print past the edge, so
         // their labels flip to the left of the marker.
-        const flip = x + 130 > width - RIGHT_PAD
+        const flip = x + 130 > plotRight(width)
         const labelX = flip ? x - 8 : x + 8
 
         return (

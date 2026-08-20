@@ -23,6 +23,13 @@
   --error: #b3261e;
 
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /*
+   * Every numeral the app sets large. `DESIGN.md` asks for IBM Plex Mono, which is not self-hosted
+   * yet; until it is, the platform's own monospace face does the two jobs that matter here — one
+   * advance per digit, so a value does not shift sideways as it changes, and digits that cannot be
+   * confused with each other at arm's length.
+   */
+  --font-numeric: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   color-scheme: light;
   -webkit-text-size-adjust: 100%;
 }
@@ -728,4 +735,20 @@ body {
   stroke: var(--paper);
   stroke-width: 1.5;
   opacity: 0.95;
+}
+
+/*
+ * A lane's current-value readout. Tabular figures are not optional on it: this is the largest
+ * number on the page, it is re-read every time a value is written down, and a digit that moves
+ * sideways between two readings is a misreading waiting to happen.
+ */
+.timeline__value {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.timeline__value-note {
+  font-variant-numeric: tabular-nums;
 }

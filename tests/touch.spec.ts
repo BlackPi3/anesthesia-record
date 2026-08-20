@@ -126,8 +126,10 @@ test('swiping over empty chart scrolls, and does not switch how the chart reads'
 }) => {
   const lane = page.getByRole('group', { name: /Sauerstoffsättigung, Achse/ })
   const box = (await lane.boundingBox())!
-  // Clear of every point: the saturation axis floor is 94 % and this case never goes near it.
-  const from = { x: box.x + box.width - 60, y: box.y + box.height - 8 }
+  // Six tenths across, not near the right edge: the right of a lane is the value rail now, and a
+  // press there is a press on the lane's furniture rather than on its chart. Vertically it stays
+  // clear of every point — the saturation axis floor is 94 % and this case never goes near it.
+  const from = { x: box.x + box.width * 0.6, y: box.y + box.height - 8 }
 
   await swipe(page, from, { x: from.x, y: from.y - 200 })
 
@@ -141,7 +143,10 @@ test('a tap on empty chart writes the values out', async ({ page }) => {
   const lane = page.getByRole('group', { name: /Sauerstoffsättigung, Achse/ })
   const box = (await lane.boundingBox())!
 
-  await page.touchscreen.tap(box.x + box.width - 60, box.y + box.height - 8)
+  // Six tenths across, not near the right edge: the right of a lane is the value rail now, and a
+  // press there is a press on the lane's furniture rather than on its chart. Vertically it stays
+  // clear of every point — the saturation axis floor is 94 % and this case never goes near it.
+  await page.touchscreen.tap(box.x + box.width * 0.6, box.y + box.height - 8)
 
   await expect(page.locator('[data-value-label]').first()).toBeVisible()
   await expect(page.locator('[data-value-label="demo-heartRate-20"]')).toHaveText('79')

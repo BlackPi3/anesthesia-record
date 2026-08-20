@@ -24,8 +24,10 @@ const labels = (page: Page) => page.locator('[data-value-label]')
 async function tapEmptyChart(page: Page) {
   const lane = page.getByRole('group', { name: SPO2_LANE })
   const box = (await lane.boundingBox())!
-  // Bottom right of the saturation lane: the axis floor is 94 % and the case never goes near it.
-  await page.mouse.click(box.x + box.width - 60, box.y + box.height - 8)
+  // Six tenths across, not near the right edge: the right of a lane is the value rail now, and a
+  // press there is a press on the lane's furniture rather than on its chart. Vertically it stays
+  // clear of every point — the saturation axis floor is 94 % and this case never goes near it.
+  await page.mouse.click(box.x + box.width * 0.6, box.y + box.height - 8)
 }
 
 async function boxesOf(locator: Locator) {

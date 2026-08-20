@@ -42,6 +42,9 @@ Everything the record holds can be written, corrected and removed, and the case 
   instead of drawing a flat line across an empty box. They do not rescale to the data, because two
   cases have to be comparable at a glance. A reading outside its lane is drawn hollow against the
   edge it went past, keeping its own number in the readout and in the written-out values.
+- **The current value of each lane** is set large in a rail to the right of the chart, level with
+  its own trace: the number, its unit, and the time it was taken. It is the newest measurement on
+  that lane and nothing else — not the selection, and never clamped to fit the axis.
 - **Reading the numbers**: a tap on the chart clear of any point drops the trend lines and writes
   every value beside its point; tapping again brings the lines back. The button above the axis does
   the same and says which of the two modes is on.
@@ -55,9 +58,9 @@ Everything the record holds can be written, corrected and removed, and the case 
 The domain layer holds the case and entry types, the vital/event catalogue with its German labels
 and ranges, the local-storage persistence layer, and a fictional demo case.
 
-89 unit tests cover the domain layer, the keypad's typing rules, and the timeline's coordinate and
-label-placement maths. 71 Playwright tests run across desktop Chrome, an iPad-sized viewport with
-touch, and WebKit — 208 runs in all.
+92 unit tests cover the domain layer, the keypad's typing rules, and the timeline's coordinate and
+label-placement maths. 79 Playwright tests run across desktop Chrome, an iPad-sized viewport with
+touch, and WebKit — 232 runs in all.
 
 This README grows alongside the build; sections appear as the thing they describe does.
 
@@ -159,6 +162,14 @@ are wide. [`labels.ts`](src/timeline/labels.ts) gives each label the first of ei
 positions that hides nothing and stays inside the lane, avoiding the markers, the labels already
 placed, and the readout of a selected point. It is pure geometry, tested with numbers like the
 scales are.
+
+The right of the chart is a fixed rail, outside the plot and shared by every band, holding each
+lane's current value at 32px. It is what makes the page read as a clinical display rather than as
+four charts: before it, the largest text on screen was the patient's name and no measured value
+was legible without switching the whole chart into its numbers mode. It says „zuletzt“ and the
+time, because this is a record and not a monitor — the number is the last value somebody wrote
+down. The pressure lane shows the pair with the mean beneath it, and where a part of a reading has
+been removed the rail prints what is recorded rather than deriving the rest.
 
 The blood pressure lane labels a whole reading rather than each of its points: one box, the three
 numbers in the order the markers run. Three values eleven pixels apart leave no position that is
