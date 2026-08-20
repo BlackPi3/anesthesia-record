@@ -1181,6 +1181,46 @@ working recovery as broken. It now corrupts once through `page.evaluate`. The te
 
 ## Open decisions (not yet made)
 
+- **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say
+  why.** Taken on an iPad in landscape on 2026-08-21, at a 1080px viewport: the timeline element is
+  1040px and its `<svg>` 1006px. `GUTTER` (168) + `VALUE_COLUMN` (136) + `RIGHT_PAD` (24) = 328px of
+  furniture, leaving 678px of plot. At `GUTTER = 100` the plot becomes 746px — **+68px, about 10%**.
+
+  Two things collide at 100px, not one. The gutter is read at three x positions: the lane name and
+  unit at `x=0`, the axis numbers right-aligned to `GUTTER − 8`, and the „Erfassen“ button
+  absolutely positioned at `left: 0; top: 40px`.
+
+  1. **Name against the ceiling number.** „Sauerstoffsättigung“ measures 109.9px at `y=20`; the
+     ceiling number sits at `y=16`, the same line, and the widest is „38,0“ at 26.4px. At 168 the
+     numbers begin at 133.6 and clear the name by 23.7px. At 100 they begin at 65.6 — **44.3px of
+     overlap**.
+  2. **Button against the midpoint number.** The button measures 93.7px and spans `y` 40–72.
+     Temperature's midpoint „36,5“ sits at `y=41`. At 168 it begins at 133.6, clear by 39.9px. At
+     100 it begins at 65.6 — **28.1px of overlap**.
+
+  The options, with what each costs:
+
+  - **Name and button above the plot, as the bands already do it.** „Medikamente“ and „Ereignisse“
+    already carry their name on a row of their own with the button in the flow beneath, so this
+    makes all six rows one shape instead of two. The gutter would then hold only axis numbers and
+    could go well below 100. It costs a row of vertical height per lane — roughly 96px over four —
+    on the form factor with the least of it, which is the whole argument against.
+  - **Abbreviate the names** to „SpO₂“, „HF“, „RR“, „Temp“. Fits 100px with room and is established
+    vocabulary on a paper Narkoseprotokoll rather than invented German. It is the cheapest by a
+    long way. It does thin the permanent text label that lets colour not carry identity — an
+    abbreviation still carries a name, but a shorter one.
+  - **Leave the gutter at 168.** Costs the 68px and nothing else.
+  - **Rejected before it is offered:** moving the axis numbers inside the plot. They would then sit
+    over data, and the numbers are already the smallest type on the canvas.
+
+  **Recommendation:** leave it at 168 for the submission and take the first option if the fixed
+  px/min rework is ever done — it is far cheaper after that rework's step 1, which lifts the gutter
+  and the rail out of the SVG into HTML columns. The plan of 2026-08-21 makes the same point from
+  the other side: 7px/min is `DESIGN.md`'s number and assumes its 100px gutter, so **item 9 and the
+  choice of scale are one decision**, and the scale is not being built. Buying 10% of one form
+  factor's width, at the cost of a design decision made in a hurry and seven videos re-recorded, is
+  not a trade worth making on the last day.
+
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
   entries sharing the timestamp the user set; the chart draws them as paired chevrons on one stem
   and labels them as one box. What is still open is what the *trend* reading of that lane should
