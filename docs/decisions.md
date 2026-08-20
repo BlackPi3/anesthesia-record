@@ -685,6 +685,34 @@ one thing a record must never do).
 
 ---
 
+## 2026-08-20 — Resetting the demo case is an ordinary, undoable change
+
+**What:** A „Demodaten zurücksetzen“ button in the header replaces the open case with a fresh
+`createDemoCase()`. It goes through `update()` like every other change, so it is written to storage,
+confirmed by the save status, and taken back by „Rückgängig“. It asks nothing first.
+
+**Why it exists at all:** the app seeds the demo case on first load and then never touches it again,
+which is right for a record but wrong for a sample. Anyone trying the app leaves entries behind, and
+the next person on that device — or the same person the next day — inherits them with no way back
+short of clearing site data in browser settings. That is not a state a person testing on a borrowed
+iPad can get out of.
+
+**Why no confirmation dialog:** the same reason nothing else in the app has one. Undo already covers
+the mistake, and it covers this one exactly: the pre-reset case is a whole object the history keeps
+a reference to, so „Rückgängig“ restores every entry, revision and deletion. A dialog would be a
+second mechanism for a problem the first one already solves.
+
+**Why it resets to the demo case and not to an empty one:** the empty case is a first-run state, not
+a starting point — a tester handed an empty chart has nothing to correct, drag or undo. Resetting is
+for getting back to the case the app ships with.
+
+**Rejected:** clearing storage and reloading the page (simpler, but it leaves the reset outside the
+undo history and outside the save confirmation, making it the one change in the app that cannot be
+taken back). Hiding it behind a URL parameter (invisible to the person who needs it, who is holding
+an iPad and not a terminal).
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored

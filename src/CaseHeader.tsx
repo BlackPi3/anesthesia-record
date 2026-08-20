@@ -53,9 +53,10 @@ export interface CaseHeaderProps {
   save: SaveState
   canUndo: boolean
   onUndo: () => void
+  onReset: () => void
 }
 
-export function CaseHeader({ record, save, canUndo, onUndo }: CaseHeaderProps) {
+export function CaseHeader({ record, save, canUndo, onUndo, onReset }: CaseHeaderProps) {
   const { patient, baseline } = record
 
   const facts: Array<[label: string, value: string]> = [
@@ -98,6 +99,18 @@ export function CaseHeader({ record, save, canUndo, onUndo }: CaseHeaderProps) {
             aria-keyshortcuts="Control+Z Meta+Z"
           >
             Rückgängig
+          </Button>
+          {/* Puts the demo case back the way it ships, discarding whatever was entered while
+              trying the app out. It belongs beside the „Demodaten“ tag because it is part of the
+              same statement: this record is a sample, and a sample has to be returnable to its
+              starting state or the next person testing on the same device inherits the last
+              person's entries.
+
+              It asks nothing first. Resetting goes through the same update path as every other
+              change, so „Rückgängig“ takes it back — which is the app's answer to destructive
+              actions everywhere else, and there is no reason for this one to be different. */}
+          <Button size="large" onClick={onReset}>
+            Demodaten zurücksetzen
           </Button>
           <SaveStatus save={save} />
         </span>

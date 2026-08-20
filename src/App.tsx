@@ -82,7 +82,15 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
 
   return (
     <div className="app">
-      <CaseHeader record={record} save={save} canUndo={canUndo} onUndo={undo} />
+      <CaseHeader
+        record={record}
+        save={save}
+        canUndo={canUndo}
+        onUndo={undo}
+        // A reset is an ordinary update to a fresh demo case, not a separate path through
+        // storage: it is written, confirmed and undone exactly like a corrected value.
+        onReset={() => update(createDemoCase())}
+      />
       <main className="app__main">
         <Timeline
           record={record}
