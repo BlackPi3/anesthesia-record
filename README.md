@@ -246,6 +246,21 @@ test can distinguish a page that scrolled from one that did not.
 Verification in Safari on physical iPad hardware is a separate step that emulation does not
 replace.
 
+## Trying it on an iPad
+
+Pushing to `main` builds the app and publishes it to GitHub Pages, which gives a link that opens on
+any device. It exists for one reason: the touch and stylus handling was written for Safari on an
+iPad, and emulation cannot confirm it. It is a preview link for testing on hardware, not a
+deployment — the completeness and deployment part of the brief is out of scope and stays that way.
+
+Everything is stored in the browser it runs in, so each person who opens the link gets their own
+copy of the demo case and nothing is shared between them. „Demodaten zurücksetzen“ in the header
+puts the case back the way it ships, discarding whatever was entered while trying it out;
+„Rückgängig“ takes the reset back like any other change.
+
+`BASE_PATH` in the workflow must match the repository name, because Pages serves the site under
+`/<repo>/`.
+
 ## Recorded user stories
 
 `docs/videos/` holds a recording of each main user story, one file per project, produced by

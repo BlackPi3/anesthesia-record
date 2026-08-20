@@ -713,6 +713,27 @@ an iPad and not a terminal).
 
 ---
 
+## 2026-08-20 — A GitHub Pages link for device testing, which is not Part 3
+
+**What:** `.github/workflows/pages.yml` builds on every push to `main` and publishes `dist/` to
+GitHub Pages. `vite.config.ts` takes its `base` from `BASE_PATH`, which only that workflow sets, so
+dev and the Playwright suite keep running at the root.
+
+**Why:** the app is written for Safari on an iPad and there is no substitute for opening it on one.
+The touch rules — the 250ms hold, the 10px slop, `touch-action`, the non-passive `touchmove` — are
+the parts of this build that emulation is least able to prove, and lending someone a link is the
+only way to get them tried on hardware that is not on this desk.
+
+**What this is not:** Part 3 of the brief (completeness check, deployment) stays out of scope. This
+is a preview link for testing, not a deployment story: no domain, no environment configuration, no
+release process, and nothing in the app depends on being hosted. Part 3 is not reopened by it.
+
+**Why the workflow lints and unit-tests before building:** a link that is live should at least
+compile and pass what runs without a browser. Playwright is not run there — it needs browser
+downloads, and it is what runs locally before a commit.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
