@@ -37,6 +37,11 @@ Everything the record holds can be written, corrected and removed, and the case 
 - **Vitals** are drawn as one lane per parameter over a shared time axis. A point is corrected by
   dragging it, by arrow keys once selected, or by opening it in the entry sheet from its readout.
   On a touchscreen a swipe scrolls the record and a press and hold is what moves a value.
+- **The value axes are narrow and fixed.** Each lane spans the window its parameter is ordinarily
+  read in rather than everything a patient could produce, so an ordinary case fills its lane
+  instead of drawing a flat line across an empty box. They do not rescale to the data, because two
+  cases have to be comparable at a glance. A reading outside its lane is drawn hollow against the
+  edge it went past, keeping its own number in the readout and in the written-out values.
 - **Reading the numbers**: a tap on the chart clear of any point drops the trend lines and writes
   every value beside its point; tapping again brings the lines back. The button above the axis does
   the same and says which of the two modes is on.
@@ -81,7 +86,9 @@ the brief asks for.
 
 `src/domain/catalog.ts` holds the per-vital German labels, units, plotted axis ranges, and the
 wider ranges the value control accepts. Both the chart and the entry control read their numbers
-from there, which is what keeps the axis and the picker from disagreeing.
+from there, which is what keeps the axis and the picker from disagreeing. The two ranges differ on
+purpose: the axis spans what a case is ordinarily read in, the control spans everything that can
+be documented, and the gap between them is what the off-scale mark is for.
 
 `src/domain/storage.ts` is the only file that touches `localStorage`. Load and save return result
 unions rather than throwing, so every caller has to handle the failure cases that local storage

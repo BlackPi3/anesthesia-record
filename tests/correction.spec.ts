@@ -120,7 +120,7 @@ test('the value cannot be pushed past the top of the axis', async ({ page }) => 
   await page.mouse.up()
 
   const after = await storedEntry(page, 'demo-heartRate-30')
-  expect(after.value).toBe(180) // the Herzfrequenz axis maximum
+  expect(after.value).toBe(140) // the Herzfrequenz axis maximum
 })
 
 test('delete removes a point from the chart but keeps it in the record', async ({ page }) => {

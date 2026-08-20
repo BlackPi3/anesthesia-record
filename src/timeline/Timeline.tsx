@@ -349,6 +349,14 @@ interface LanePoint {
   value: number
   x: number
   y: number
+  /**
+   * Which edge of the lane the value fell past, if it fell past one. The bands are narrow enough
+   * to be read, which means a value can sit outside one, and `y` is then the edge rather than the
+   * value's true position. Nothing may go missing from a clinical record because of a drawing
+   * choice, so an off-scale point is still drawn, still selectable, and still prints its real
+   * number — it is only drawn differently, and marked as being off the scale.
+   */
+  offScale: 'above' | 'below' | null
 }
 
 /** A correction in progress. Lives in the lane, since a drag never leaves the lane it began in. */
@@ -443,6 +451,8 @@ function VitalLane({
   const color = laneColor[lane.id]
 
   const [min, max] = domain
+  // Every kind in a lane shares one scale and therefore one precision; see laneRange.
+  const decimals = VITALS[lane.vitals[0]].decimals
   const valueTicks = [min, (min + max) / 2, max]
   const grid = gridTimes(window.from, window.to)
 
@@ -455,7 +465,18 @@ function VitalLane({
         const live = drag && drag.id === entry.id ? drag : null
         const at = live ? live.at : entry.at
         const value = live ? live.value : entry.value
-        return { id: entry.id, kind, at, value, x: scales.time.map(at), y: scales.value.map(value) }
+        // Drawn at the edge when it is past it, so the mark stays inside its own lane and inside
+        // the hit radius that selects it. The number itself is untouched; only `y` is clamped.
+        const offScale = value > max ? 'above' : value < min ? 'below' : null
+        return {
+          id: entry.id,
+          kind,
+          at,
+          value,
+          x: scales.time.map(at),
+          y: scales.value.map(clamp(value, min, max)),
+          offScale,
+        }
       })
       .sort((a, b) => a.at - b.at),
   }))
@@ -614,7 +635,18 @@ function VitalLane({
     if (!drag.moved && travelled <= DRAG_THRESHOLD) return
 
     corrected.current = true
-    setDrag({ ...drag, moved: true, ...pointerToMeasurement(at, scales, VITALS[drag.kind].step) })
+    const measurement = pointerToMeasurement(at, scales, VITALS[drag.kind].step)
+    // A point already outside the band has no position on it, so a drag cannot mean a new value
+    // for it — every pixel of the lane would read as "bring it back inside", and a saturation of
+    // 88 would silently become 94 on the way to nudging its timestamp. Such a point moves in time
+    // only; its value stays what was recorded until the keypad or the arrow keys change it.
+    const offScale = drag.value > max || drag.value < min
+    setDrag({
+      ...drag,
+      moved: true,
+      at: measurement.at,
+      value: offScale ? drag.value : measurement.value,
+    })
   }
 
   /**
@@ -669,11 +701,15 @@ function VitalLane({
     if (!active) return
 
     const step = VITALS[active.kind].step
+    // Bounded by what the metric can be, not by what the lane happens to draw. The arrow keys are
+    // the precision path, and a point resting off the end of the band has to be adjustable from
+    // where it actually is — clamping to the band would snap it inside on the first keypress.
+    const [floor, ceiling] = VITALS[active.kind].inputRange
     const move = (at: Timestamp, value: number) => {
       event.preventDefault()
       onCorrect(active.id, {
         at: clamp(at, window.from, window.to),
-        value: snapToStep(clamp(value, min, max), step),
+        value: snapToStep(clamp(value, floor, ceiling), step),
       })
     }
 
@@ -710,7 +746,7 @@ function VitalLane({
       className={grabbed ? 'timeline__lane timeline__lane--grabbed' : 'timeline__lane'}
       role="group"
       tabIndex={0}
-      aria-label={`${lane.label}, Achse von ${min} bis ${max} ${laneUnit(lane)}. Punkt auswählen und mit den Pfeiltasten korrigieren, mit der Eingabetaste bearbeiten.`}
+      aria-label={`${lane.label}, Achse von ${formatNumber(min, decimals)} bis ${formatNumber(max, decimals)} ${laneUnit(lane)}. Punkt auswählen und mit den Pfeiltasten korrigieren, mit der Eingabetaste bearbeiten.`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -775,7 +811,7 @@ function VitalLane({
           textAnchor="end"
           style={{ fontVariantNumeric: 'tabular-nums' }}
         >
-          {formatNumber(value, VITALS[lane.vitals[0]].decimals)}
+          {formatNumber(value, decimals)}
         </text>
       ))}
 
@@ -807,6 +843,7 @@ function VitalLane({
               x={point.x}
               y={point.y}
               color={color}
+              offScale={point.offScale}
             />
           ))}
         </g>
@@ -850,12 +887,14 @@ function Marker({
   x,
   y,
   color,
+  offScale,
 }: {
   id: string
   kind: VitalKind
   x: number
   y: number
   color: string
+  offScale: 'above' | 'below' | null
 }) {
   // Addressable by entry id so a test can drag one specific point and assert what it became.
   const shared = {
@@ -864,6 +903,25 @@ function Marker({
     stroke: chart.surface,
     strokeWidth: 2,
     cursor: 'grab',
+  }
+
+  /**
+   * A value past the end of the band. It is drawn hollow and as an arrowhead pointing the way it
+   * went, which says two things the ordinary marker cannot: that the reading is real, and that
+   * where it sits on the lane is not where its number is. Hollow, because a filled mark at the
+   * edge would be read as a measurement taken at the edge.
+   */
+  if (offScale) {
+    const tip = offScale === 'above' ? y - 5 : y + 5
+    const base = offScale === 'above' ? y + 4 : y - 4
+    return (
+      <path
+        d={`M ${x} ${tip} L ${x + 5.5} ${base} L ${x - 5.5} ${base} Z`}
+        {...shared}
+        fill={chart.surface}
+        stroke={color}
+      />
+    )
   }
 
   if (kind === 'bloodPressureSystolic') {

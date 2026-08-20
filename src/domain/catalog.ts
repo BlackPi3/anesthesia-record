@@ -9,6 +9,16 @@
  * `plotRange` is what the axis spans. `inputRange` is what the value control can produce, and is
  * deliberately wider: a real desaturation must be recordable even though it falls off the normal
  * chart window. Neither is a clinical judgement, and nothing here interprets a value.
+ *
+ * The plot ranges are narrow on purpose. An axis wide enough to hold every value a patient could
+ * ever produce draws every ordinary case as a flat line across an empty box, which is the opposite
+ * of what a chart is for. So each one spans the window a case is ordinarily read in, and a value
+ * outside it is drawn at the edge of the lane as an off-scale mark rather than being either hidden
+ * or allowed to stretch the axis. They are **fixed**: two cases have to be comparable at a glance,
+ * which they are not if the axis rescales itself to whatever it was given.
+ *
+ * Each range is chosen so that its midpoint is a round number, because the lane labels its floor,
+ * its midpoint and its ceiling.
  */
 
 import type { BolusUnit, InfusionRateUnit, PhaseEventKind, VitalKind } from './types'
@@ -34,7 +44,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     label: 'Sauerstoffsättigung',
     short: 'SpO₂',
     unit: '%',
-    plotRange: [70, 100],
+    plotRange: [94, 100],
     inputRange: [50, 100],
     step: 1,
     decimals: 0,
@@ -43,7 +53,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     label: 'Herzfrequenz',
     short: 'HF',
     unit: '/min',
-    plotRange: [30, 180],
+    plotRange: [40, 140],
     inputRange: [20, 250],
     step: 1,
     decimals: 0,
@@ -79,7 +89,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     label: 'Temperatur',
     short: 'Temp',
     unit: '°C',
-    plotRange: [34, 40],
+    plotRange: [35, 38],
     inputRange: [30, 43],
     step: 0.1,
     decimals: 1,

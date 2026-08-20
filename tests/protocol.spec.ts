@@ -104,3 +104,47 @@ test('does not scroll sideways at either form factor', async ({ page }) => {
   )
   expect(overflows).toBe(false)
 })
+
+/**
+ * A value that falls outside its lane's band.
+ *
+ * The bands are deliberately narrow, so an unusual reading can land past the end of one — and a
+ * desaturation is precisely the reading the saturation lane exists for. It has to stay on the
+ * chart: a record that quietly drops the one measurement anybody would go looking for is worse
+ * than an axis with nothing in it. It is drawn against the edge it went past, and it keeps its
+ * own number wherever that number is written.
+ */
+test('draws a value past the end of a band at the edge rather than dropping it', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Sauerstoffsättigung erfassen' }).click()
+  const sheet = page.getByRole('dialog')
+  for (const digit of '88') {
+    await sheet.getByRole('button', { name: digit, exact: true }).click()
+  }
+  await sheet.getByRole('button', { name: 'Übernehmen' }).click()
+  await expect(sheet).toBeHidden()
+
+  const stored = await page.evaluate(() => {
+    const envelope = JSON.parse(window.localStorage.getItem('anesthesia-record:case')!)
+    const saturations = envelope.case.entries.filter(
+      (entry: { type: string; vital?: string }) => entry.type === 'vital' && entry.vital === 'spo2',
+    )
+    return saturations[saturations.length - 1]
+  })
+  expect(stored.value).toBe(88)
+
+  const marker = page.locator(`[data-entry-id="${stored.id}"]`)
+  await expect(marker).toBeVisible()
+
+  const lane = page.getByRole('group', { name: /Sauerstoffsättigung, Achse/ })
+  const laneBox = (await lane.boundingBox())!
+  const markerBox = (await marker.boundingBox())!
+  // Inside its own lane, and down against the floor of it rather than off below the axis.
+  expect(markerBox.y).toBeGreaterThan(laneBox.y + laneBox.height / 2)
+  expect(markerBox.y + markerBox.height).toBeLessThanOrEqual(laneBox.y + laneBox.height + 1)
+
+  // The number it reads out is the number that was recorded, not the edge it is resting against.
+  await page.mouse.click(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2)
+  await expect(page.locator(`[data-readout="${stored.id}"]`)).toHaveAttribute('aria-label', /88 %/)
+})

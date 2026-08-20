@@ -104,24 +104,24 @@ describe('gridTimes', () => {
 describe('pointerToMeasurement', () => {
   const area = { left: 0, right: 600, top: 0, bottom: 300 }
   const window = { from: CASE_START, to: CASE_START + minutes(60) }
-  const scales = createLaneScales(area, window, VITALS.spo2.plotRange) // [70, 100]
+  const scales = createLaneScales(area, window, VITALS.spo2.plotRange) // [94, 100]
 
   it('maps the top of the lane to the highest value and the bottom to the lowest', () => {
     expect(pointerToMeasurement({ x: 0, y: 0 }, scales, 1).value).toBe(100)
-    expect(pointerToMeasurement({ x: 0, y: 300 }, scales, 1).value).toBe(70)
+    expect(pointerToMeasurement({ x: 0, y: 300 }, scales, 1).value).toBe(94)
   })
 
   it('maps a position in the plot to the timestamp and value it sits on', () => {
-    // Half way across a 60 minute window, half way up a 70–100 axis.
+    // Half way across a 60 minute window, half way up a 94–100 axis.
     const measurement = pointerToMeasurement({ x: 300, y: 150 }, scales, 1)
     expect(measurement.at).toBe(CASE_START + minutes(30))
-    expect(measurement.value).toBe(85)
+    expect(measurement.value).toBe(97)
   })
 
   it('clamps a pointer that leaves the plot area instead of inventing a value', () => {
     const belowLeft = pointerToMeasurement({ x: -80, y: 420 }, scales, 1)
     expect(belowLeft.at).toBe(window.from)
-    expect(belowLeft.value).toBe(70)
+    expect(belowLeft.value).toBe(94)
 
     const aboveRight = pointerToMeasurement({ x: 900, y: -50 }, scales, 1)
     expect(aboveRight.at).toBe(window.to)
@@ -129,9 +129,9 @@ describe('pointerToMeasurement', () => {
   })
 
   it('snaps the value to the metric step', () => {
-    const temperature = createLaneScales(area, window, VITALS.temperature.plotRange) // [34, 40]
+    const temperature = createLaneScales(area, window, VITALS.temperature.plotRange) // [35, 38]
     const measurement = pointerToMeasurement({ x: 0, y: 150 }, temperature, 0.1)
-    expect(measurement.value).toBe(37)
+    expect(measurement.value).toBe(36.5)
     expect(Number.isInteger(measurement.value * 10)).toBe(true)
   })
 
@@ -165,6 +165,45 @@ describe('lane configuration', () => {
     for (const kind of BLOOD_PRESSURE_KINDS) {
       expect(VITALS[kind].plotRange[0]).toBeGreaterThanOrEqual(min)
       expect(VITALS[kind].plotRange[1]).toBeLessThanOrEqual(max)
+    }
+  })
+
+  /**
+   * The bands are narrow enough that their edges matter, so the two properties that keep a narrow
+   * band honest are asserted rather than left to the eye.
+   */
+  it('labels its midpoint with a number that is actually on the axis', () => {
+    for (const lane of LANES) {
+      const [min, max] = laneRange(lane)
+      const { decimals, step } = VITALS[lane.vitals[0]]
+      const middle = (min + max) / 2
+      // The lane prints floor, midpoint and ceiling rounded to the metric's precision. A midpoint
+      // that does not survive that rounding is a gridline drawn somewhere other than where its
+      // own label says it is.
+      expect(Number(middle.toFixed(decimals)), `lane "${lane.id}" has a ragged midpoint`).toBe(
+        middle,
+      )
+      expect(snapToStep(middle, step)).toBe(middle)
+    }
+  })
+
+  it('never draws an axis reaching further than the value control can go', () => {
+    for (const lane of LANES) {
+      const [min, max] = laneRange(lane)
+      expect(min, `lane "${lane.id}" has an empty axis`).toBeLessThan(max)
+
+      // Stated per lane rather than per kind, because the axis belongs to the lane: the three
+      // pressures share one, and the diastolic in particular is drawn on a scale reaching higher
+      // than a diastolic is ever entered. What must hold is that the lane's own floor and ceiling
+      // are numbers *something* in it can be, or the axis promises a reading it cannot hold.
+      const reach = lane.vitals.map((kind) => VITALS[kind].inputRange)
+      expect(Math.min(...reach.map(([low]) => low)), `lane "${lane.id}" floor`).toBeLessThanOrEqual(
+        min,
+      )
+      expect(
+        Math.max(...reach.map(([, high]) => high)),
+        `lane "${lane.id}" ceiling`,
+      ).toBeGreaterThanOrEqual(max)
     }
   })
 

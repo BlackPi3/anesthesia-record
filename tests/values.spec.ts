@@ -24,7 +24,7 @@ const labels = (page: Page) => page.locator('[data-value-label]')
 async function tapEmptyChart(page: Page) {
   const lane = page.getByRole('group', { name: SPO2_LANE })
   const box = (await lane.boundingBox())!
-  // Bottom right of the saturation lane: the axis runs to 70 % and the case never goes near it.
+  // Bottom right of the saturation lane: the axis floor is 94 % and the case never goes near it.
   await page.mouse.click(box.x + box.width - 60, box.y + box.height - 8)
 }
 
@@ -181,6 +181,6 @@ test('correcting a point rewrites its number and does not put the numbers away',
   // The corrected point is the selected one, so its value is now in the readout.
   await expect(page.locator('[data-readout="demo-heartRate-30"]')).toHaveAttribute(
     'aria-label',
-    /HF 180 \/min/,
+    /HF 140 \/min/,
   )
 })

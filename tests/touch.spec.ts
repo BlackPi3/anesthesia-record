@@ -126,7 +126,7 @@ test('swiping over empty chart scrolls, and does not switch how the chart reads'
 }) => {
   const lane = page.getByRole('group', { name: /Sauerstoffsättigung, Achse/ })
   const box = (await lane.boundingBox())!
-  // Clear of every point: the saturation axis runs down to 70 % and this case never goes near it.
+  // Clear of every point: the saturation axis floor is 94 % and this case never goes near it.
   const from = { x: box.x + box.width - 60, y: box.y + box.height - 8 }
 
   await swipe(page, from, { x: from.x, y: from.y - 200 })

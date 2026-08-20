@@ -361,6 +361,40 @@ a direct one: read `document.activeElement` and see what it says.
 
 ---
 
+## 2026-08-20 — Narrowing an axis is a change to what the chart can say
+
+Three of the four lanes plotted over 90% empty: saturation spanned 70–100 and used 97–100,
+temperature spanned 34–40 and used 36,2–36,6. The page read as four boxes of grid with a flat line
+in each, and the fix looked like editing four pairs of numbers.
+
+It was not, because **a wide axis was hiding a decision nobody had made**. At 70–100 no saturation
+this app can record falls off the lane, so "what does a value outside the axis look like" had never
+come up. At 94–100 it comes up on the first desaturation — the single reading the lane most exists
+to show. The drawing code mapped value to pixel with no clamp, and each lane is its own `<svg>`,
+which clips: the point would not have been drawn wrong, it would have been *absent*, with no error
+and nothing failing. So the narrowing had to bring the off-scale case with it — clamp the drawn
+`y`, keep the real number, and mark the point as resting on the edge rather than measured there.
+
+Two correction paths had the same shape of bug hiding in them. `pointerToMeasurement` clamps to the
+axis, so dragging an off-scale point sideways to fix its time would have quietly rewritten 88 to
+94; and the arrow keys clamped to the axis too, so one press on an off-scale point snapped it
+inside. The arrow keys now bound to `inputRange` — **what the metric can be, not what the lane
+happens to draw** — and a drag on an off-scale point moves it in time only.
+
+Choosing the ranges had one constraint worth writing down: the lane labels its floor, midpoint and
+ceiling, so a band whose midpoint is not round draws a gridline somewhere other than where its own
+label says it is. Picking 94–100, 40–140 and 35,0–38,0 satisfies that with no new code, which is
+why there is no tick configuration anywhere — **the constraint was cheaper to satisfy than to
+implement.** It is asserted in `scales.test.ts` so the next edit to a range cannot quietly break it.
+
+That same test run caught something pre-existing: the diastolic `plotRange` is 40–220 while its
+`inputRange` stops at 200. Not a bug — the three pressures share one axis and the diastolic simply
+never occupies the top of it — but it did prove the invariant belonged to the lane rather than to
+the kind. **An assertion that fails on correct code is still telling you something**, and here it
+was that the property had been stated about the wrong object.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional
