@@ -781,7 +781,61 @@ the record stopped persisting, and there red means what red means.
 **One provisional number:** the infusion bar's opacity dropped from 0.75 to 0.55, because
 `--ink-muted` is darker than the grey it replaced and the two bars would otherwise have become the
 heaviest ink on the page while carrying the least interesting content on it. It goes away when the
-bar becomes a thin rule in the drug's own colour, rather than being retuned.
+bar becomes a thin rule, rather than being retuned. *Superseded 2026-08-20 by the entry below: the
+opacity is gone. The rule is not in "the drug's own colour" as written here — there is no such
+colour, and there is not going to be one.*
+
+---
+
+## 2026-08-20 — The medication band's symbols are ink, and there is no drug colour
+
+**What:** a bolus is a 16×2px vertical tick in `--ink` at its time; an infusion is a 3px rule in
+`--ink-muted` spanning the period it ran, capped at each end by a 10×2px serif. The dose keeps its
+place beside the mark and moves from `--ink-muted` to `--ink`. The 5px dot, the 12px rounded slab
+and the 0.55 opacity holding that slab's weight down are all gone.
+
+**Why:** measured off a screenshot rather than argued, the two slabs were the heaviest ink on the
+page and carried the least interesting content on it — a fluid running is the one thing in a
+protocol nobody has to look up. The rule is about a quarter of the slab's area, which is why the
+opacity is deleted rather than retuned: the weight problem is now solved by size, and an opacity
+was only ever a way of drawing a too-large mark too faintly.
+
+**The tick also separates a dose from a measurement.** A bolus drawn as a filled circle wore the
+Herzfrequenz lane's own marker one band away from it, and the two mean nothing alike. The symbol
+vocabulary is the design specification's, taken from the paper protocol, and it is read instantly
+by the people this is for.
+
+**There is no drug colour, and the phrase should not have been written down.** The plan said "a
+thin bar in the drug's colour". The design specification names three trace hues and all three are
+vitals; it supplies no medication colour anywhere. Decided by Parham on 2026-08-20: ink only. The
+palette stays at six interface values and four traces, and colour keeps meaning "this is a vital,
+and which one" — a fifth hue that is not a vital would weaken exactly that. Two alternatives were
+put and rejected: drugs solid and fluids hollow (a 3px outlined rule is barely visible on an iPad,
+and "hollow" already means "this value went off its axis" one band up), and a single new
+medication hue (costs the six-value discipline for a band that has just been made deliberately
+quiet).
+
+**The serif is shorter than the bolus tick, at 10px against 16px.** Cut to the same height the two
+became one mark: the start of a Remifentanil infusion and a Propofol bolus are both a dose given
+at a time, and at a glance they told the same story. Shorter, and in the lighter ink, the serif
+reads as the end of its rule rather than as a mark in its own right.
+
+**A running infusion closes with nothing.** The rule still runs to the right edge of the window, as
+before; it simply has no end serif, so an open end looks open. Verified by creating one through the
+sheet and photographing the band, not by reading the branch.
+
+**Step notches at rate changes have nothing to act on, and drawing them would have been a lie.**
+The plan asked for them. This model has no rate change inside an infusion entry: a rate change is
+documented by stopping the entry and starting a new one, which is two entries and therefore two
+rows. The only in-entry candidate is `revisions`, and a revision is a *correction*, not a rate
+change — drawing a typo repair as a step would assert that the drug ran at the wrong rate for the
+first half of its infusion, which is the opposite of what an audit trail is for. The serif is the
+notch mark, established at the ends of the rule, so if per-drug rows are ever merged onto one line
+the mark is already there and already means "the rate changed here".
+
+**Rejected:** enlarging the dose to carry the row now that the marks are lighter. That is the
+current-value readout item, it belongs to the lanes as much as to this band, and doing half of it
+here would have set the type size twice.
 
 ---
 

@@ -71,6 +71,29 @@ const LANE_INSET = 12
 const LANE_BASE_HEIGHT = 92
 const AXIS_HEIGHT = 30
 const MED_ROW_HEIGHT = 34
+/**
+ * The medication band's two marks, from the paper protocol: a bolus is a vertical tick at its
+ * time, an infusion a thin rule spanning the period it ran, serifed at each end.
+ *
+ * Sized against what they replaced rather than in the abstract. A 5px dot and a 12px slab were the
+ * heaviest ink on the page while carrying the least interesting content on it — a fluid running is
+ * the one thing in a protocol nobody has to look up. The tick covers about 40% of the dot's area
+ * and the rule a quarter of the slab's, which is why the 0.55 opacity that used to hold the slab's
+ * weight down is gone rather than retuned: the weight is now solved by size, and an opacity was
+ * only ever a way of drawing a too-large mark too faintly.
+ *
+ * The tick is also what separates a dose from a measurement. A bolus drawn as a filled circle
+ * wears the heart rate lane's marker, one band away from it, and the two mean nothing alike.
+ */
+const MED_TICK = 16
+const MED_RULE = 3
+/**
+ * The serif capping an infusion is deliberately shorter than a bolus tick. Cut to the tick's 16px
+ * the two became one mark: the start of a Remifentanil infusion and a Propofol bolus are both a
+ * dose given at a time, and at a glance they told the same story. Shorter, and in the lighter ink,
+ * the serif reads as the end of its rule rather than as a mark in its own right.
+ */
+const MED_SERIF = 10
 const EVENT_ROW_HEIGHT = 34
 /** Width of a milestone's hit area, sized to the label beside it rather than to the dot. */
 const EVENT_HIT_WIDTH = 138
@@ -1337,37 +1360,53 @@ function MedicationBand({
             </text>
 
             {entry.type === 'bolus' ? (
-              <circle
-                cx={start}
-                cy={y}
-                r={5}
-                fill={chart.inkMuted}
-                stroke={chart.paper}
+              <line
+                x1={start}
+                x2={start}
+                y1={y - MED_TICK / 2}
+                y2={y + MED_TICK / 2}
+                stroke={chart.ink}
                 strokeWidth={2}
               />
             ) : (
-              <rect
-                x={start}
-                y={y - 6}
-                width={end - start}
-                height={12}
-                rx={4}
-                fill={chart.inkMuted}
-                /*
-                 * Held at the weight it had under the old palette. `--ink-muted` is a good deal
-                 * darker than the `#898781` this bar used to wear, and at 0.75 the two bars became
-                 * the heaviest ink on the page while carrying the least interesting content on it.
-                 * Provisional: the bar is due to become a thin rule in the drug's own colour, at
-                 * which point this number goes away rather than being retuned.
-                 */
-                opacity={0.55}
-              />
+              <>
+                <rect
+                  x={start}
+                  y={y - MED_RULE / 2}
+                  width={end - start}
+                  height={MED_RULE}
+                  fill={chart.inkMuted}
+                />
+                {/* Serifs, not the rule, are what say where an infusion ran. A 3px rule is thin
+                    enough that its own ends read as the line fading out, and the one thing this
+                    row has to answer is when the drug started and whether it has stopped. A
+                    running infusion is drawn to the right edge of the window and closes with
+                    nothing, so an open end looks open. */}
+                <line
+                  x1={start}
+                  x2={start}
+                  y1={y - MED_SERIF / 2}
+                  y2={y + MED_SERIF / 2}
+                  stroke={chart.inkMuted}
+                  strokeWidth={2}
+                />
+                {entry.endedAt !== null && (
+                  <line
+                    x1={end}
+                    x2={end}
+                    y1={y - MED_SERIF / 2}
+                    y2={y + MED_SERIF / 2}
+                    stroke={chart.inkMuted}
+                    strokeWidth={2}
+                  />
+                )}
+              </>
             )}
 
             <text
               x={flip ? start - 10 : end + 10}
               y={y + 4}
-              fill={chart.inkMuted}
+              fill={chart.ink}
               fontSize={11}
               textAnchor={flip ? 'end' : 'start'}
               style={{ fontVariantNumeric: 'tabular-nums' }}
