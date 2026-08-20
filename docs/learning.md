@@ -516,6 +516,44 @@ decimal tail would have passed on `[50, 75, 100, 125]`. **Rounding is not one pr
 lattice you round onto is the part that can be wrong.**
 
 
+## 2026-08-20 — The flaky test was right: the dev server was dropping the fonts
+
+Two tests in `tests/typography.spec.ts` failed on `ipad-safari` a few times in a hundred, and only
+with the rest of the suite running — alone they passed eight times out of eight. The tempting fix
+is a retry or a longer wait. What the instrumentation said instead:
+
+```
+REQ  /node_modules/@fontsource-variable/ibm-plex-sans/…-wght-normal.woff2
+RES  200 font/woff2 len=45712
+REQ  /node_modules/@fontsource/ibm-plex-mono/…-400-normal.woff2
+REQ  /node_modules/@fontsource/ibm-plex-mono/…-500-normal.woff2
+faces: Sans/loaded, Mono 400/error, Mono 500/error
+```
+
+The two mono requests were **issued and never answered**. No response, no failure — WebKit waited,
+gave up, painted the fallback and marked both faces `error`, and `document.fonts.ready` then
+resolved as though the page were done. Five runs in twenty. The Vite dev server, single instance,
+serving three browser projects in parallel while transforming modules for all of them, simply did
+not get to two files.
+
+**So the flake was not a timing artefact in the test — it was the thing under test failing.** The
+suite now runs against `vite preview` on the built app: zero errors in twenty, and about 20% faster
+because nothing is transformed per request. It is also what actually ships to an iPad, which is the
+better reason.
+
+A second, genuinely different cause survived the switch, in "one advance per digit" alone. A canvas
+measures the document's font set as it stands and falls back in silence, and `document.fonts.ready`
+only settles the loads pending when it is called — the chart paints on a second pass, after
+`useElementWidth` measures its container, so the rail's mono 500 can be requested after `ready` has
+resolved. The test now names the face it wants. That is not a wait: `document.fonts.load` returns
+the faces that matched, so a face the app never declared still comes back empty and the test still
+fails — as it does when the `@font-face` blocks are deleted, which is now checked.
+
+**Two failures wearing one costume.** Both looked like "the font sometimes isn't there", and the
+fix for either would have left the other in place — a retry would have hidden a dev server that
+drops requests, and the preview server alone still failed one run in three.
+
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

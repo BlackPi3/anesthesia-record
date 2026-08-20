@@ -55,8 +55,21 @@ export default defineConfig({
     },
   ],
 
+  /**
+   * The built app, not the dev server.
+   *
+   * This started as a flake and turned out to be a defect in what was being tested. Under the
+   * suite's own parallel load the Vite dev server left the three IBM Plex Mono requests unanswered
+   * often enough that WebKit gave up on them — a quarter of runs, measured — painted the fallback,
+   * and marked the faces `error`. Everything that depends on those metrics then measured the
+   * platform's monospace instead. Against `vite preview` the same measurement errored zero times
+   * in twenty, and the suite runs about 20% faster because nothing is transformed per request.
+   *
+   * It is also the more honest target. Safari on an iPad will be given `dist`, with hashed static
+   * assets and no module graph, and a font that arrives in dev is not evidence about the artifact.
+   */
   webServer: {
-    command: `npm run dev -- --port ${PORT}`,
+    command: `npm run build && npm run preview -- --port ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

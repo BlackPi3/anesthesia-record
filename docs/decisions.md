@@ -1007,6 +1007,33 @@ on the same question.
 
 ---
 
+## 2026-08-20 — The end-to-end suite runs against the built app
+
+**What:** `playwright.config.ts` starts `npm run build && npm run preview` rather than the dev
+server.
+
+**Why:** it was found doing the wrong thing, not chosen on principle. Two WebKit tests in
+`tests/typography.spec.ts` failed intermittently, and instrumenting the requests showed the Vite dev
+server leaving the three IBM Plex Mono files unanswered under the suite's own parallel load — a
+quarter of runs on `ipad-safari`. WebKit gave up on them, painted the fallback and marked the faces
+`error`, so anything measuring those metrics measured the platform's monospace. Against the built
+app the same measurement errored zero times in twenty, four consecutive full runs were green, and
+the suite got about 20% faster because nothing is transformed per request.
+
+The better reason is what it now tests. Safari on an iPad is given `dist` — hashed static assets,
+one bundle, no module graph — and a font that arrives through a dev server is not evidence about
+the artifact anyone will open. The build costs about 200ms.
+
+**Rejected:** retrying or waiting longer in the tests, which is the usual answer to a flake and
+here would have hidden a server dropping requests; and lowering the worker count, which reduces the
+contention without fixing what the contention exposed.
+
+**Kept in mind:** `reuseExistingServer` is still on outside CI, so a dev server left running on the
+port will be used instead. That is Playwright's own behaviour and predates this change, but it is
+now a way to test something other than what the config says.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored

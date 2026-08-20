@@ -178,6 +178,11 @@ npm test          # vitest
 npm run e2e       # playwright: desktop-chrome, ipad, ipad-safari
 ```
 
+**`npm run e2e` builds and serves `dist`, not the dev server.** Safari on an iPad is given the
+built artifact, and a font that arrives in dev is not evidence about the one that ships — the dev
+server was in fact dropping font requests under the suite's own parallel load. Anything that only
+works with HMR or with unbundled modules will not be seen by these tests.
+
 All four green before a commit.
 
 ## README

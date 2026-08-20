@@ -14,7 +14,8 @@ import { expect, test, type Page } from '@playwright/test'
  *
  * So these ask the browser rather than the source, and they were checked by breaking the app three
  * ways. Pointing `--font-numeric` at a proportional family fails three of the four. Deleting the
- * `@font-face` declarations fails two.
+ * `@font-face` declarations fails the two that name a face to the browser — "both faces are served"
+ * and "one advance per digit" — on all three projects.
  *
  * What the fourth does **not** catch is worth writing down, because it is the sort of thing this
  * file would otherwise be read as promising. `getComputedStyle().fontFamily` returns the declared
@@ -26,6 +27,12 @@ import { expect, test, type Page } from '@playwright/test'
  *
  * They matter most on WebKit. `labels.ts` is the code that most depends on text metrics, Safari on
  * iPad is a target browser, and a webfont that loads in Chromium is not evidence about either.
+ *
+ * Two of them were flaky on WebKit until 2026-08-20, and neither cause was in this file. The suite
+ * ran against the Vite dev server, which under its own parallel load left the mono requests
+ * unanswered often enough that WebKit gave up on them; `playwright.config.ts` now serves the built
+ * app. And a canvas measures the font set as it stands, so "one advance per digit" names the face
+ * it wants rather than trusting that the chart has already painted it.
  */
 
 const SPO2_LANE = /Sauerstoffsättigung, Achse/
@@ -128,13 +135,28 @@ test('a value label is as wide as the geometry says it is', async ({ page }) => 
 test('one advance per digit, so a number does not move as it changes', async ({ page }) => {
   // The reason mono is on values at all, and the one property a screenshot cannot show. Measured
   // through the real face rather than argued from its metrics.
-  const widths = await page.evaluate(() => {
+  const { present, widths } = await page.evaluate(async () => {
+    // A canvas measures whatever is in the document's font set when it is asked, and falls back
+    // in silence when the face it names is absent — which is the failure this line exists to take
+    // out of the test. `document.fonts.ready` in the beforeEach settles the loads pending at the
+    // moment it is called, and the chart paints on a second pass, after `useElementWidth` has
+    // measured its container; the rail's mono 500 can therefore be requested after `ready` has
+    // already resolved. Naming the face is what makes this a measurement of metrics rather than
+    // of paint timing. It hides nothing: a face that genuinely never arrives is still absent here.
+    const loaded = await document.fonts.load('500 32px "IBM Plex Mono"', '0123456789,')
+
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')!
     context.font = '500 32px "IBM Plex Mono"'
-    return ['111', '988', '36,8', '142'].map((text) => context.measureText(text).width)
+    return {
+      present: loaded.length > 0,
+      widths: ['111', '988', '36,8', '142'].map((text) => context.measureText(text).width),
+    }
   })
 
+  // Asserted before the widths, so a face that did not arrive says so instead of being reported as
+  // a font with the wrong metrics.
+  expect(present).toBe(true)
   // Same character count, different digits: identical width. This is the property, and it is what
   // a proportional face does not have — in Plex Sans "111" is visibly narrower than "988".
   expect(Math.abs(widths[0] - widths[1])).toBeLessThan(0.5)
