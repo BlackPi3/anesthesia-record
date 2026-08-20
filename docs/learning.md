@@ -443,6 +443,56 @@ alternated above and below the trace for no reason. They sit on one row now.
 
 ---
 
+---
+
+## 2026-08-20 — `document.fonts.check` was answering a different question
+
+The typography tests assert that the app serves its own faces rather than borrowing the platform's.
+The obvious way to ask is `document.fonts.check('600 13px "IBM Plex Mono"')`, and it returned
+`false` on all three projects while nine sibling assertions passed.
+
+Nothing was broken. `check` asks *is this already downloaded*, and a browser does not download a
+weight nothing on screen is set in. Mono 600 is the entry sheet's 56px value and the chart's value
+labels — one lives behind a drawer and the other behind a toggle, so on the first screen the weight
+is declared and correctly unfetched. The test was reading a browser being efficient as a missing
+font.
+
+`document.fonts.load(spec, text)` is the question that was meant: it fetches what matches and
+resolves with the faces it matched. An empty array means the app never declared that weight; a
+rejection means it declared a file it cannot serve. Both are real failures, and neither depends on
+what happens to be painted when the test runs.
+
+The general shape: **an API that returns `false` is not always saying no to the question you
+asked.** `check` and `load` differ by tense, and the failing assertion looked exactly like a broken
+`@font-face` — a wrong hypothesis that would have survived a while, because the first thing anyone
+does with it is go and re-read the font declarations, which were fine.
+
+---
+
+## 2026-08-20 — A test can pass because the fallback is as good as the font
+
+`tests/typography.spec.ts` was checked by breaking the app three ways before being trusted, which
+is the rule in `CLAUDE.md` about asking what would still pass if the feature were deleted. Two of
+the three sabotages behaved as expected. The third did not: deleting the `@font-face` declarations
+left "a value label is as wide as the geometry says it is" **passing**.
+
+Two reasons, both worth keeping in mind.
+
+`getComputedStyle(el).fontFamily` returns the stack that was *declared*, not the face that drew the
+glyphs. There is no DOM API that names the font actually used, so an assertion on computed style
+can only prove that a CSS rule reached an element.
+
+And the fallback is `ui-monospace`, which on macOS is SF Mono, which also advances 0.6 em. The
+arithmetic the test checks was still correct — because the property it depends on is *monospace*,
+not *Plex*.
+
+That is not a hole once it is named. The width test proves the geometry matches whatever face is
+drawing, which is the property layout depends on; the loading test proves the face is Plex and is
+served from here. Written into the spec's own header so it is not read as promising the other
+thing. **The value of a sabotage is not that the test failed — it is finding out precisely which
+claim each test is making.**
+
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

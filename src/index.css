@@ -1,3 +1,5 @@
+@import './fonts.css';
+
 /*
  * The six-value palette, mirroring `theme.ts`. AntD's own components are themed there through its
  * tokens; these are for the hand-written CSS, and the two files carry the same hexes on purpose —
@@ -22,14 +24,22 @@
      value will not be written — which is what red actually means on a clinical display. */
   --error: #b3261e;
 
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   /*
-   * Every numeral the app sets large. `DESIGN.md` asks for IBM Plex Mono, which is not self-hosted
-   * yet; until it is, the platform's own monospace face does the two jobs that matter here — one
-   * advance per digit, so a value does not shift sideways as it changes, and digits that cannot be
-   * confused with each other at arm's length.
+   * Two faces, declared in `fonts.css`, and the split between them is a rule rather than a taste:
+   * `--font-numeric` is what the record holds — a measured value, a dose, a clock time — and
+   * `--font-sans` is everything the interface says about it. So „RR 142/85 mmHg · HF 80/min“ in
+   * the header stays sans, because it is a sentence with numbers in it, while the 98 in a lane's
+   * rail is mono, because it is the number itself. Numerals inside prose are not split out into
+   * their own face: two faces inside one 14px line is harder to read, not easier.
+   *
+   * Mono does the two jobs that matter for a value: one advance per digit, so a number does not
+   * shift sideways as it changes, and digits that cannot be confused with each other at arm's
+   * length. `tabular-nums` stays on both — Plex Mono is already tabular, and the sans is not.
    */
-  --font-numeric: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-numeric: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  font-family: var(--font-sans);
   color-scheme: light;
   -webkit-text-size-adjust: 100%;
 }
@@ -203,6 +213,7 @@ body {
 }
 
 .value-field__number {
+  font-family: var(--font-numeric);
   font-size: 56px;
   font-weight: 600;
   line-height: 1;
@@ -250,6 +261,7 @@ body {
 }
 
 .keypad .ant-btn {
+  font-family: var(--font-numeric);
   width: 100%;
   height: 100%;
   padding: 0;
@@ -327,6 +339,7 @@ body {
 }
 
 .pressure__notation {
+  font-family: var(--font-numeric);
   font-size: 44px;
   font-weight: 600;
   line-height: 1;
@@ -373,6 +386,8 @@ body {
   border: 1px solid transparent;
   border-radius: 8px;
   font: inherit;
+  /* After `font: inherit`, which resets the family along with everything else. */
+  font-family: var(--font-numeric);
   font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -504,6 +519,7 @@ body {
 }
 
 .history__time {
+  font-family: var(--font-numeric);
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -524,6 +540,7 @@ body {
 }
 
 .time-field__clock {
+  font-family: var(--font-numeric);
   font-size: 28px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -738,6 +755,18 @@ body {
 }
 
 /*
+ * Every number drawn inside the chart: the time axis, a lane's own value ticks, the value labels
+ * of the reading mode, the readout on a selected point, a dose, an event's time. It is the same
+ * set as the CSS rules above, said once instead of six times, and it is exactly the set of SVG
+ * `<text>` elements that were already carrying `tabular-nums` inline — the numeric boundary in the
+ * chart had been drawn before this face existed, so this rule follows it rather than redrawing it.
+ */
+.timeline__num {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
  * A lane's current-value readout. Tabular figures are not optional on it: this is the largest
  * number on the page, it is re-read every time a value is written down, and a digit that moves
  * sideways between two readings is a misreading waiting to happen.
@@ -746,9 +775,10 @@ body {
   font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
-  letter-spacing: -0.01em;
 }
 
+/* The unit and „zuletzt HH:MM“ under a lane's readout: the same number, said smaller. */
 .timeline__value-note {
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
 }

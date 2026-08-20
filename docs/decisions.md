@@ -886,7 +886,8 @@ gutter included, which was already wrong and would have made the largest target 
 that changes how the whole record reads by accident. It is now bounded to the plot area.
 
 **Mono, tabular, at the platform's own monospace face.** `--font-numeric` in `index.css`, so item 5
-of the conversion list swaps IBM Plex Mono in at one place. 32px sits in the middle of `DESIGN.md`'s
+of the conversion list swaps IBM Plex Mono in at one place. *Superseded 2026-08-20 by the
+typography entry below: it swapped, and at that one place.* 32px sits in the middle of `DESIGN.md`'s
 28–40px and is the largest size the shortest lane holds — Temperatur is 74px, and 32 plus two 15px
 lines leaves a margin at each end. One size across all four: a rail whose numbers are different
 sizes is not a rail.
@@ -900,6 +901,57 @@ labels on one shared row had not been applying at all, on either form factor. Fi
 anything under one square pixel as free. Written up in `docs/learning.md`; the regression test
 places one label at a coordinate found by searching for noise that flips the comparison, because
 every existing test used whole pixels, which is the one arithmetic where the bug cannot happen.
+
+---
+
+## 2026-08-20 — Two faces, and the boundary between them is what the record holds
+
+Item 5 of the `DESIGN.md` conversion list. IBM Plex Sans on the interface, IBM Plex Mono on
+numerals, both self-hosted. Supersedes the note in the readout entry above, which parked
+`--font-numeric` on the platform's monospace face until this landed.
+
+**„For all numerals“ needed a boundary, and Parham chose the narrow one.** Put to him on 2026-08-20
+with three readings drawn out. Taken literally, a numeral inside a sentence is a numeral: the
+header's „RR 142/85 mmHg · HF 80/min“ would have to have its digit runs wrapped and set in a second
+face, which means two faces inside one 14px line and a formatting helper every string in the header
+passes through. The other end was mono only on the numbers set large. What was chosen is the
+middle: **mono is what the record holds — a measured value, a dose, a clock time — and sans is
+everything the interface says about it.** So the header's baseline row stays sans, and the 98 in a
+lane's rail is mono, because it is the number itself rather than a sentence containing one.
+
+That rule turned out to have already been drawn. Every hand-written CSS rule and every SVG `<text>`
+carrying `font-variant-numeric: tabular-nums` was a candidate, and applying the rule to those
+thirteen selectors and six elements one at a time moved five of them: `.picker__lead` is a drug
+name, `.pressure-row__short` is „SYS“, `.time-field__steps .ant-btn` says „Jetzt“ alongside „+5“,
+`.value-field__range` is a sentence about limits, and `.case-facts dd` is prose. They keep tabular
+figures and stay in the sans. The six SVG sites all moved, and now share one `.timeline__num`
+class instead of six inline styles.
+
+**The `@fontsource` stylesheets are not used, only their files.** Importing them declares nine
+subsets per weight and puts roughly 3 MB of woff2 into `dist` for Cyrillic and Vietnamese this
+interface cannot render. Four hand-written `@font-face` blocks in `src/fonts.css` ship the latin
+subset alone: one variable file for the sans, covering 100–700, and three static weights of the
+mono, which has no variable release. 91 kB. The packages stay in `package.json` because they are
+where the version and the licence live and where an update comes from.
+
+**`latin` alone is provably enough, not hopefully enough.** The app has no free-text input of any
+kind, so every string it can draw is authored in this repo, and every non-ASCII character in `src/`
+sits inside U+0000–U+00FF or U+2000–U+206F. Three do not — → ₂ ⌫ — and IBM Plex carries none of
+them in any subset, so they fall through to the platform face per glyph either way.
+
+**One number in the chart's geometry is now read off a font file.** `labels.ts` sizes the value
+labels and the readout pill from a character count, and both were multiplying by a width measured
+against the old face. Every glyph of IBM Plex Mono advances exactly 600/1000 em, read out of the
+shipped `.woff2`, so those widths stopped being estimates and became arithmetic — which matters
+because the placement search decides which labels collide, and a width a few percent out was
+deciding overlap on a number nobody had checked. `tests/typography.spec.ts` is what holds that
+claim, in the browser and on WebKit, because a font file is now an input to layout and nothing else
+would complain if it stopped arriving.
+
+**Known, and left alone: mono spaces its punctuation.** A comma and a colon each take a full
+advance, so „36,5“ and „09:45“ are airier than they were. That is what a tabular face is — the
+separator is unmistakable at a glance and the digits either side of it cannot move — and it is one
+line to revert per site if it reads wrong on a real iPad.
 
 ---
 

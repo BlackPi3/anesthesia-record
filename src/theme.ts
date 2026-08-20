@@ -60,7 +60,10 @@ export const antdTheme: ThemeConfig = {
     colorSuccess: '#5c6470',
     colorWarning: '#5c6470',
     colorError: '#b3261e',
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    // The same stack `--font-sans` carries in `index.css`, written out rather than `var()`-ed:
+    // this is a JS object AntD reads before any stylesheet has applied, so a custom property
+    // would resolve to nothing here. The two copies are the one place the faces are duplicated.
+    fontFamily: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
     fontSize: 15,
     borderRadius: 6,
     controlHeight: 40,

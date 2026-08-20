@@ -1,0 +1,64 @@
+/*
+ * The two faces, self-hosted.
+ *
+ * `DESIGN.md` asks for IBM Plex Sans on labels and IBM Plex Mono on numerals. The files come from
+ * the two `@fontsource` packages, which are the upstream IBM releases repackaged — so the version
+ * and the licence are tracked in `package.json` and an update is `npm update`, not a re-download.
+ * What is *not* used is their own stylesheets: those declare nine subsets per weight, and importing
+ * them puts roughly 3 MB of woff2 into `dist` for the sake of Cyrillic and Vietnamese this
+ * interface cannot render. Declaring the faces here instead ships the four files below, about 90 kB.
+ *
+ * `latin` alone is enough, and that is checkable rather than hopeful: the app has no free-text
+ * input of any kind, so every string it can ever draw is authored in this repo, and every non-ASCII
+ * character in `src/` — ä ö ü Ä Ü ß µ · – — „ “ − × ° … — is inside U+0000–U+00FF or U+2000–U+206F.
+ * Three are not: → (U+2192), ₂ (U+2082) and ⌫ (U+232B), which IBM Plex does not carry in any subset
+ * anyway. They fall through to the platform face per glyph, which is what the fallback stack is for.
+ *
+ * Sans is the variable file: one download covers 100–700, and the interface uses 400 through 700.
+ * Mono has no variable release, so it is three static weights — 400 for axis and dose text, 500 for
+ * the lane readouts, 600 for the sheet's large numerals and the labels on the chart.
+ *
+ * `font-display: swap` on purpose. The first paint of a clinical record should be the record, in
+ * the platform face, rather than a blank page waiting on a webfont.
+ */
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

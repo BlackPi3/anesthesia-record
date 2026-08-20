@@ -140,16 +140,35 @@ const CHEVRON_ROOM = 18
 const READOUT_HEIGHT = 22
 
 /**
+ * One character of IBM Plex Mono, as a fraction of the font size.
+ *
+ * Read from the shipped `.woff2` rather than guessed: every glyph in the file has an advance of
+ * 600 units against a 1000-unit em, which is what makes the width of any string in it arithmetic
+ * instead of a measurement. Two places on the chart size a box around text they cannot ask the DOM
+ * about — the value labels and the readout pill — and both are set in this face.
+ *
+ * If the numeric face is ever changed, this number changes with it, and `tests/typography.spec.ts`
+ * is what says so out loud: it measures a real label in a real browser against this figure.
+ */
+const MONO_ADVANCE = 0.6
+
+/**
  * The value labels of the reading mode. A point larger than the marker it labels, deliberately:
  * this text exists because the chart was not readable as numbers, so it is set at the size of the
- * axis labels rather than smaller. Width is estimated from the character count — these are two to
- * five tabular digits, never prose, so measuring the text in the DOM would buy nothing.
+ * axis labels rather than smaller.
+ *
+ * `LABEL_CHAR_WIDTH` is no longer an estimate. These labels are set in IBM Plex Mono, every glyph
+ * of which advances exactly 600/1000 em, so a label's width *is* its character count times
+ * `MONO_ADVANCE * LABEL_FONT` — 7.8px at 13px. That matters more here than it looks: the placement
+ * search decides which labels collide, so a width that was a few percent off was deciding overlap
+ * on a number nobody had measured. It is also why this stays out of the DOM: there is nothing left
+ * for a measurement to discover.
  *
  * `LABEL_HEIGHT` is the height of one line. A blood pressure label carries three of them.
  */
 const LABEL_FONT = 13
 const LABEL_HEIGHT = 18
-const LABEL_CHAR_WIDTH = 7.6
+const LABEL_CHAR_WIDTH = MONO_ADVANCE * LABEL_FONT
 const LABEL_PADDING = 6
 /**
  * The marker's own footprint, which no label may sit on.
@@ -365,12 +384,12 @@ function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
             />
             {labelled && (
               <text
+                className="timeline__num"
                 x={x}
                 y={AXIS_HEIGHT - 11}
                 fill={chart.inkMuted}
                 fontSize={12}
                 textAnchor="middle"
-                style={{ fontVariantNumeric: 'tabular-nums' }}
               >
                 {formatTime(time)}
               </text>
@@ -859,12 +878,12 @@ function VitalLane({
       {valueTicks.map((value) => (
         <text
           key={value}
+          className="timeline__num"
           x={GUTTER - 8}
           y={scales.value.map(value) + 4}
           fill={chart.inkMuted}
           fontSize={11}
           textAnchor="end"
-          style={{ fontVariantNumeric: 'tabular-nums' }}
         >
           {formatNumber(value, decimals)}
         </text>
@@ -1044,6 +1063,7 @@ function ValueLabel({ box, points, color }: { box: Box; points: LanePoint[]; col
       {points.map((point, line) => (
         <text
           key={point.id}
+          className="timeline__num"
           data-value-label={point.id}
           x={box.x + box.width / 2}
           y={box.y + line * LABEL_HEIGHT + LABEL_HEIGHT / 2 + 4.5}
@@ -1051,7 +1071,6 @@ function ValueLabel({ box, points, color }: { box: Box; points: LanePoint[]; col
           fontSize={LABEL_FONT}
           fontWeight={600}
           textAnchor="middle"
-          style={{ fontVariantNumeric: 'tabular-nums' }}
         >
           {formatValue(point.kind, point.value)}
         </text>
@@ -1275,7 +1294,11 @@ function LaneValue({
  * opaque, it is wide, and it lands exactly where a value label would otherwise go.
  */
 function readoutBox(point: LanePoint, area: PlotArea): Box {
-  const width = readoutLabel(point).length * 6.6 + 16 + CHEVRON_ROOM
+  // 12px is the pill's own font size; see `MONO_ADVANCE`. One character in the whole app escapes
+  // that arithmetic — the ₂ of SpO₂, which IBM Plex does not carry and which falls through to the
+  // platform's monospace face — and the pill's 16px of padding is wider than any advance it could
+  // come back with.
+  const width = readoutLabel(point).length * (MONO_ADVANCE * 12) + 16 + CHEVRON_ROOM
   const nearTop = point.y - area.top < 40
 
   return {
@@ -1334,13 +1357,13 @@ function Readout({
         opacity={grabbed ? 0.92 : 0.78}
       />
       <text
+        className="timeline__num"
         x={x + (boxWidth - CHEVRON_ROOM) / 2}
         y={y + 15}
         fill={chart.paper}
         fontSize={12}
         fontWeight={600}
         textAnchor="middle"
-        style={{ fontVariantNumeric: 'tabular-nums' }}
       >
         {label}
       </text>
@@ -1598,12 +1621,12 @@ function MedicationBand({
             )}
 
             <text
+              className="timeline__num"
               x={flip ? start - 10 : end + 10}
               y={y + 4}
               fill={chart.ink}
               fontSize={11}
               textAnchor={flip ? 'end' : 'start'}
-              style={{ fontVariantNumeric: 'tabular-nums' }}
             >
               {dose}
             </text>
@@ -1686,12 +1709,12 @@ function EventBand({
               {PHASE_EVENTS[event.event].label}
             </text>
             <text
+              className="timeline__num"
               x={labelX}
               y={y + 25}
               fill={chart.inkMuted}
               fontSize={11}
               textAnchor={flip ? 'end' : 'start'}
-              style={{ fontVariantNumeric: 'tabular-nums' }}
             >
               {formatTime(event.at)}
             </text>
