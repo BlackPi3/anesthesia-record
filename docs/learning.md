@@ -493,6 +493,29 @@ thing. **The value of a sabotage is not that the test failed — it is finding o
 claim each test is making.**
 
 
+## 2026-08-20 — `snapToStep` snaps to a lattice through zero, and a lane's rules do not
+
+Adding the horizontal rules, the obvious way to clear floating-point dust off `min + i * step` was
+`snapToStep`, which is already in `scales.ts` for exactly that job on entered values. It is the
+wrong function here and the reason is one line: it rounds to the nearest **multiple of the step**,
+which is a lattice through zero, and a lane's rules run on the lattice through the band's *floor*.
+
+The heart rate lane is ruled every 25 from 40, so it has a rule at 90. `snapToStep(90, 25)` is 100.
+Every rule in that lane and in the blood pressure lane was moved, and because the moved values then
+failed to equal the midpoint, **both lanes silently stopped printing their axis numbers**.
+
+Two things worth keeping.
+
+The screenshot showed it in about two seconds — two of four lanes had lost the numbers down their
+left edge — and no amount of reading the diff would have. That is the `CLAUDE.md` rule about
+verifying by looking, hit again on the first change after it was written down.
+
+And the test that catches it is not the one about dust. `valueTicks([40, 140], 25)` returning
+`[40, 65, 90, 115, 140]` is the assertion; a test that only checked that no value had a long
+decimal tail would have passed on `[50, 75, 100, 125]`. **Rounding is not one property. Which
+lattice you round onto is the part that can be wrong.**
+
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

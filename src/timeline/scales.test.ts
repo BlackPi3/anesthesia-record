@@ -4,8 +4,10 @@ import {
   BLOOD_PRESSURE_KINDS,
   GRID_INTERVAL_MS,
   LANES,
+  MAJOR_INTERVAL_MS,
   VITALS,
   laneForVital,
+  laneGridStep,
   laneRange,
   laneUnit,
 } from '../domain/catalog'
@@ -16,6 +18,7 @@ import {
   linearScale,
   pointerToMeasurement,
   snapToStep,
+  valueTicks,
 } from './scales'
 
 const CASE_START = new Date('2026-08-12T08:30:00').getTime()
@@ -84,6 +87,12 @@ describe('snapToStep', () => {
 })
 
 describe('gridTimes', () => {
+  it('draws every major rule on one of the five-minute lines', () => {
+    // The two weights are one grid, not two laid over each other: the quarter-hour rule is always
+    // also a five-minute line, which is what lets a single pass draw both.
+    expect(MAJOR_INTERVAL_MS % GRID_INTERVAL_MS).toBe(0)
+  })
+
   it('aligns ticks to wall-clock five-minute marks, not to the case start', () => {
     const from = CASE_START + minutes(2) // 08:32
     const ticks = gridTimes(from, from + minutes(11))
@@ -98,6 +107,44 @@ describe('gridTimes', () => {
   it('returns nothing for an inverted or zero-interval window', () => {
     expect(gridTimes(CASE_START + minutes(5), CASE_START)).toEqual([])
     expect(gridTimes(CASE_START, CASE_START + minutes(30), 0)).toEqual([])
+  })
+})
+
+describe('valueTicks', () => {
+  it('rules the band from its floor to its ceiling', () => {
+    expect(valueTicks([94, 100], 1).map((tick) => tick.value)).toEqual([94, 95, 96, 97, 98, 99, 100])
+  })
+
+  /**
+   * The regression this function was born with. The rules run on the lattice through the band's
+   * floor, not the one through zero, and rounding them with `snapToStep` moved a heart rate lane's
+   * 90 to 100 — which then failed to match the midpoint, so the lane drew its rules in the wrong
+   * places and printed no axis numbers at all. Visible immediately in a screenshot, invisible in
+   * the source.
+   */
+  it('rules from the floor rather than from the nearest multiple of the step', () => {
+    expect(valueTicks([40, 140], 25).map((tick) => tick.value)).toEqual([40, 65, 90, 115, 140])
+    expect(valueTicks([40, 220], 30).map((tick) => tick.value)).toEqual([
+      40, 70, 100, 130, 160, 190, 220,
+    ])
+  })
+
+  it('labels the floor, the midpoint and the ceiling, and nothing else', () => {
+    const labelled = valueTicks([40, 140], 25)
+      .filter((tick) => tick.labelled)
+      .map((tick) => tick.value)
+    expect(labelled).toEqual([40, 90, 140])
+  })
+
+  it('leaves no floating-point dust on a band that steps in tenths', () => {
+    const values = valueTicks([35, 38], 0.1).map((tick) => tick.value)
+    expect(values).toContain(35.7)
+    expect(values.at(-1)).toBe(38)
+  })
+
+  it('collapses instead of looping forever on a degenerate band', () => {
+    expect(valueTicks([50, 50], 1)).toEqual([{ value: 50, labelled: true }])
+    expect(valueTicks([40, 140], 0)).toEqual([{ value: 40, labelled: true }])
   })
 })
 
@@ -184,6 +231,26 @@ describe('lane configuration', () => {
         middle,
       )
       expect(snapToStep(middle, step)).toBe(middle)
+    }
+  })
+
+  it('rules its band in a rhythm that reaches its midpoint', () => {
+    for (const lane of LANES) {
+      const [min, max] = laneRange(lane)
+      const step = laneGridStep(lane)
+      // The lane's three labelled rules are floor, midpoint and ceiling. A spacing that does not
+      // divide the half-span would step past the midpoint, putting the one rule that carries a
+      // number between two hairlines instead of on the grid it belongs to.
+      expect((max - min) / 2 / step, `lane "${lane.id}" rules past its midpoint`).toBe(
+        Math.round((max - min) / 2 / step),
+      )
+
+      const labelled = valueTicks([min, max], step).filter((tick) => tick.labelled)
+      expect(labelled.map((tick) => tick.value), `lane "${lane.id}"`).toEqual([
+        min,
+        (min + max) / 2,
+        max,
+      ])
     }
   })
 

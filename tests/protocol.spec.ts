@@ -39,6 +39,36 @@ test('draws one lane per vital parameter plus the bands', async ({ page }) => {
   await expect(page.getByRole('img', { name: /Zeitachse von/ })).toBeVisible()
 })
 
+/**
+ * The canvas is one time scale, and since the grid is drawn by the lanes *and* by both bands, it
+ * is now drawn from that scale in three places. Each computes its own plot edges, so a change to
+ * the gutter or to the value rail that reaches one and not the others would put a dose at one x
+ * and the vitals of that minute at another — the whole reason the bands share the lanes' right
+ * edge. Asserted on the rules rather than on the entries, because a rule is on the grid by
+ * construction and an entry only happens to be.
+ */
+test('rules the lanes and the bands on the same time scale', async ({ page }) => {
+  // The quarter-hour rules of one band: vertical, in the major grey, and not the dashed rule a
+  // phase milestone draws. Read as coordinates rather than as bounding boxes, because x1 in the
+  // lane's own user units is the number the shared scale actually produced.
+  const rules = (name: string | RegExp) =>
+    page
+      .getByRole('group', { name })
+      .locator('line[stroke="#c9c6be"]:not([stroke-dasharray])')
+      .evaluateAll((lines) =>
+        lines
+          .filter((line) => line.getAttribute('x1') === line.getAttribute('x2'))
+          .map((line) => Number(line.getAttribute('x1'))),
+      )
+
+  const lane = await rules(/Herzfrequenz, Achse/)
+  expect(lane.length).toBeGreaterThan(2)
+  // The medication band and not the event band: a milestone's stem is a vertical line in the same
+  // grey, so the event band cannot be told apart from its own grid by colour alone. What this test
+  // is for is that a band computes the same plot edges as a lane, and one band proves that.
+  expect(await rules('Medikamente und Infusionen')).toEqual(lane)
+})
+
 test('restores the stored case after a reload rather than seeding a new one', async ({ page }) => {
   // Comparing the saved timestamp is what makes this test mean something: a screen that merely
   // looks right would also appear if the app had thrown the case away and re-seeded it.

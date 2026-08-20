@@ -104,6 +104,48 @@ export function gridTimes(
   return times
 }
 
+/** One horizontal rule of a lane, and whether it is one of the three that carry a number. */
+export interface ValueTick {
+  value: number
+  /** Floor, midpoint and ceiling: drawn heavier, and the only ones labelled. */
+  labelled: boolean
+}
+
+/**
+ * The horizontal rules of a lane: one every `step` from the floor to the ceiling.
+ *
+ * Two weights rather than one. The labelled three are what the axis is read by and stay as they
+ * were; the rules between them are what makes a value readable *between* two labels, which is the
+ * whole reason a ruled sheet is ruled. `step` is required to divide the half-span, so the midpoint
+ * is always among the rules produced — catalog.ts holds that requirement and scales.test.ts
+ * asserts it.
+ *
+ * Each value is rounded to the precision the step is written in, because a temperature band steps
+ * in tenths and `35 + 7 * 0.1` is not 35.7. Rounded, not snapped: `snapToStep` puts a value on the
+ * lattice of multiples of the step running through zero, and these rules run through the band's
+ * floor instead — a heart rate lane ruled every 25 from 40 has a rule at 90, which snapping would
+ * move to 100 and then fail to recognise as the midpoint.
+ */
+export function valueTicks(
+  domain: readonly [number, number],
+  step: number,
+): ValueTick[] {
+  const [min, max] = domain
+  if (step <= 0 || max <= min) return [{ value: min, labelled: true }]
+
+  const places = Math.max(decimalPlaces(step), decimalPlaces(min))
+  const round = (value: number) => Number(value.toFixed(places))
+  const middle = round((min + max) / 2)
+
+  const ticks: ValueTick[] = []
+  const count = Math.round((max - min) / step)
+  for (let i = 0; i <= count; i += 1) {
+    const value = round(min + i * step)
+    ticks.push({ value, labelled: value === min || value === max || value === middle })
+  }
+  return ticks
+}
+
 /** The rectangle a lane's data is drawn in, in SVG user units. */
 export interface PlotArea {
   left: number

@@ -36,8 +36,10 @@ import { Button } from 'antd'
 import {
   GRID_INTERVAL_MS,
   LANES,
+  MAJOR_INTERVAL_MS,
   PHASE_EVENTS,
   VITALS,
+  laneGridStep,
   laneRange,
   laneUnit,
 } from '../domain/catalog'
@@ -56,6 +58,8 @@ import {
   gridTimes,
   pointerToMeasurement,
   snapToStep,
+  valueTicks,
+  type LinearScale,
   type PlotArea,
   type TimeWindow,
 } from './scales'
@@ -342,17 +346,69 @@ function AddButton({
 
 // ---------------------------------------------------------------------------
 
-/** Gridline times, and how often to label them so the axis stays readable when narrow. */
+/**
+ * The five-minute reference grid, in the two weights it is read in.
+ *
+ * One weight for the whole grid is fifteen identical hairlines with nothing to count from, which
+ * is why a paper protocol rules its quarter hours darker. The hairline says where five minutes is;
+ * the rule says where the eye goes back to. Both are chrome, so both stay lighter than any ink
+ * that carries a value.
+ *
+ * Drawn by every lane *and* by both bands, from the same window and the same scale. The canvas is
+ * one time scale — that is what putting medications under vitals is for — and a band with no grid
+ * under it leaves a dose floating at a time nobody can read off.
+ */
+function TimeGrid({
+  scale,
+  window,
+  top,
+  bottom,
+}: {
+  scale: LinearScale
+  window: TimeWindow
+  top: number
+  bottom: number
+}) {
+  return (
+    <>
+      {gridTimes(window.from, window.to).map((time) => {
+        const major = time % MAJOR_INTERVAL_MS === 0
+        const x = scale.map(time)
+        return (
+          <line
+            key={time}
+            x1={x}
+            x2={x}
+            y1={top}
+            y2={bottom}
+            stroke={major ? chart.gridMajor : chart.gridMinor}
+            strokeWidth={major ? 1 : 0.5}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+/**
+ * Gridline times, and how often to label them so the axis stays readable when narrow.
+ *
+ * Labels sit on major rules and nowhere else. Thinning them on a narrow canvas therefore
+ * multiplies the quarter hour rather than stepping through the ticks: whatever carries a time is
+ * also drawn as a rule, so a label always names a line the eye can follow down the canvas.
+ */
 function useAxisTicks(window: TimeWindow, width: number) {
   const times = gridTimes(window.from, window.to)
   const plotWidth = plotRight(width) - GUTTER
+  const span = window.to - window.from
+  const perMajor = span > 0 ? (MAJOR_INTERVAL_MS / span) * plotWidth : plotWidth
   // A time label needs roughly 46px to stand clear of its neighbour.
-  const every = Math.max(1, Math.ceil((times.length * 46) / Math.max(plotWidth, 1)))
-  return { times, labelEvery: every }
+  const every = Math.max(1, Math.ceil(46 / Math.max(perMajor, 1)))
+  return { times, labelInterval: MAJOR_INTERVAL_MS * every }
 }
 
 function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
-  const { times, labelEvery } = useAxisTicks(window, width)
+  const { times, labelInterval } = useAxisTicks(window, width)
   const scale = createLaneScales(
     { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
@@ -369,18 +425,19 @@ function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
       <text x={0} y={AXIS_HEIGHT - 9} fill={chart.inkMuted} fontSize={12} fontWeight={500}>
         Uhrzeit
       </text>
-      {times.map((time, index) => {
+      {times.map((time) => {
         const x = scale.map(time)
-        const labelled = index % labelEvery === 0
+        const major = time % MAJOR_INTERVAL_MS === 0
+        const labelled = time % labelInterval === 0
         return (
           <Fragment key={time}>
             <line
               x1={x}
               x2={x}
-              y1={AXIS_HEIGHT - 6}
+              y1={AXIS_HEIGHT - (major ? 8 : 5)}
               y2={AXIS_HEIGHT}
-              stroke={labelled ? chart.gridMajor : chart.gridMinor}
-              strokeWidth={1}
+              stroke={major ? chart.gridMajor : chart.gridMinor}
+              strokeWidth={major ? 1 : 0.5}
             />
             {labelled && (
               <text
@@ -514,8 +571,7 @@ function VitalLane({
   const [min, max] = domain
   // Every kind in a lane shares one scale and therefore one precision; see laneRange.
   const decimals = VITALS[lane.vitals[0]].decimals
-  const valueTicks = [min, (min + max) / 2, max]
-  const grid = gridTimes(window.from, window.to)
+  const rules = valueTicks(domain, laneGridStep(lane))
 
   // The point being dragged renders at the pointer, not at its stored position, so the correction
   // is visible while it is being made rather than only after release.
@@ -828,31 +884,21 @@ function VitalLane({
       onClick={handleClick}
       onKeyDown={handleKeyDown}
     >
-      {/* Value gridlines, recessive: they orient, they are not data. */}
-      {valueTicks.map((value) => (
+      {/* Value rules, recessive: they orient, they are not data. Heavier on the three the lane
+          labels, so a value can be read against the nearest number rather than against the band. */}
+      {rules.map(({ value, labelled }) => (
         <line
           key={value}
           x1={area.left}
           x2={area.right}
           y1={scales.value.map(value)}
           y2={scales.value.map(value)}
-          stroke={chart.gridMinor}
-          strokeWidth={1}
+          stroke={labelled ? chart.gridMajor : chart.gridMinor}
+          strokeWidth={labelled ? 1 : 0.5}
         />
       ))}
 
-      {/* Five-minute reference grid. */}
-      {grid.map((time) => (
-        <line
-          key={time}
-          x1={scales.time.map(time)}
-          x2={scales.time.map(time)}
-          y1={area.top}
-          y2={area.bottom}
-          stroke={chart.gridMinor}
-          strokeWidth={time % (GRID_INTERVAL_MS * 6) === 0 ? 1 : 0.5}
-        />
-      ))}
+      <TimeGrid scale={scales.time} window={window} top={area.top} bottom={area.bottom} />
 
       {/* Phase events, carried through every lane so correlations stay readable in place. */}
       {events.map((event) => (
@@ -875,19 +921,21 @@ function VitalLane({
         {laneUnit(lane)}
       </text>
 
-      {valueTicks.map((value) => (
-        <text
-          key={value}
-          className="timeline__num"
-          x={GUTTER - 8}
-          y={scales.value.map(value) + 4}
-          fill={chart.inkMuted}
-          fontSize={11}
-          textAnchor="end"
-        >
-          {formatNumber(value, decimals)}
-        </text>
-      ))}
+      {rules
+        .filter((rule) => rule.labelled)
+        .map(({ value }) => (
+          <text
+            key={value}
+            className="timeline__num"
+            x={GUTTER - 8}
+            y={scales.value.map(value) + 4}
+            fill={chart.inkMuted}
+            fontSize={11}
+            textAnchor="end"
+          >
+            {formatNumber(value, decimals)}
+          </text>
+        ))}
 
       {lane.id === 'bloodPressure' && (
         <BloodPressureConnectors readings={readings(points)} color={color} />
@@ -946,12 +994,15 @@ function VitalLane({
           follow a drag of the newest point, because that point's value is genuinely changing. */}
       <LaneValue lane={lane} reading={latest} width={width} height={height} />
 
+      {/* The row separator, in the same grey as the quarter-hour rules: the lanes are stacked
+          bands of one canvas, and what divides them should read as heavier than what rules them
+          and lighter than anything drawn inside them. */}
       <line
         x1={area.left}
         x2={area.right}
         y1={height - 0.5}
         y2={height - 0.5}
-        stroke={chart.gridMinor}
+        stroke={chart.gridMajor}
         strokeWidth={1}
       />
     </svg>
@@ -1536,6 +1587,8 @@ function MedicationBand({
       role="group"
       aria-label="Medikamente und Infusionen"
     >
+      <TimeGrid scale={scale} window={window} top={24} bottom={height} />
+
       <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
         Medikamente
       </text>
@@ -1682,6 +1735,8 @@ function EventBand({
       role="group"
       aria-label="Ereignisse"
     >
+      <TimeGrid scale={scale} window={window} top={24} bottom={height} />
+
       <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
         Ereignisse
       </text>

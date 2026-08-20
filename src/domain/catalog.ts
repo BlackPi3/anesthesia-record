@@ -33,6 +33,15 @@ export interface VitalMeta {
   plotRange: [number, number]
   /** [min, max] the value control allows. */
   inputRange: [number, number]
+  /**
+   * Spacing of the lane's unlabelled horizontal rules.
+   *
+   * Must divide the half-span exactly. The lane labels its floor, its midpoint and its ceiling,
+   * and those three are drawn as the heavier rules; a spacing that steps past the midpoint would
+   * put the labelled rule between two hairlines, which draws the axis in a rhythm its own numbers
+   * do not follow. Asserted in scales.test.ts.
+   */
+  gridStep: number
   /** Step of the value control. */
   step: number
   /** Decimal places when displaying the value. */
@@ -46,6 +55,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     unit: '%',
     plotRange: [94, 100],
     inputRange: [50, 100],
+    gridStep: 1,
     step: 1,
     decimals: 0,
   },
@@ -55,6 +65,10 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     unit: '/min',
     plotRange: [40, 140],
     inputRange: [20, 250],
+    // 10 would be the rounder rhythm for a pulse and is the other divisor of the half-span, but
+    // at this lane's drawn height it puts a rule every seven pixels, which is texture rather than
+    // a grid. 25 is the coarser of the two the midpoint allows.
+    gridStep: 25,
     step: 1,
     decimals: 0,
   },
@@ -64,6 +78,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     unit: 'mmHg',
     plotRange: [40, 220],
     inputRange: [40, 300],
+    gridStep: 30,
     step: 1,
     decimals: 0,
   },
@@ -73,6 +88,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     unit: 'mmHg',
     plotRange: [40, 220],
     inputRange: [30, 250],
+    gridStep: 30,
     step: 1,
     decimals: 0,
   },
@@ -82,6 +98,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     unit: 'mmHg',
     plotRange: [40, 220],
     inputRange: [20, 200],
+    gridStep: 30,
     step: 1,
     decimals: 0,
   },
@@ -91,6 +108,7 @@ export const VITALS: Record<VitalKind, VitalMeta> = {
     unit: '°C',
     plotRange: [35, 38],
     inputRange: [30, 43],
+    gridStep: 0.5,
     step: 0.1,
     decimals: 1,
   },
@@ -151,6 +169,18 @@ export const FLUIDS = ['Ringer-Acetat', 'NaCl 0,9 %', 'Glucose 5 %'] as const
 
 /** Gridline spacing on the time axis, in milliseconds. Reference only, entries are not snapped. */
 export const GRID_INTERVAL_MS = 5 * 60 * 1000
+
+/**
+ * Spacing of the heavier time rules, and of every axis label.
+ *
+ * The five-minute grid is the clinical reference the brief asks for, but read alone it is fifteen
+ * identical hairlines with no place to hold on to. The quarter hour is what a protocol is actually
+ * spoken in, so it is drawn heavier and is the only spacing that ever carries a time.
+ *
+ * A multiple of `GRID_INTERVAL_MS`, so every major rule is also one of the five-minute lines
+ * rather than a second grid laid over the first.
+ */
+export const MAJOR_INTERVAL_MS = 15 * 60 * 1000
 
 // ---------------------------------------------------------------------------
 // Amounts
@@ -255,6 +285,14 @@ export function laneRange(lane: LaneDef): [number, number] {
     Math.min(...ranges.map(([min]) => min)),
     Math.max(...ranges.map(([, max]) => max)),
   ]
+}
+
+/**
+ * The spacing of the lane's horizontal rules. Taken from the lane's first kind, like its unit and
+ * its precision: the kinds in a lane share one scale, so they share the grid drawn on it.
+ */
+export function laneGridStep(lane: LaneDef): number {
+  return VITALS[lane.vitals[0]].gridStep
 }
 
 /** The unit shared by every kind in the lane. */

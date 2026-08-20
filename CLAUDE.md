@@ -109,6 +109,15 @@ than visibly wrong. Anything that bounds a correction bounds it by `inputRange`,
 Each band's midpoint must be round at the metric's precision, because the lane labels its floor,
 midpoint and ceiling; `scales.test.ts` asserts this.
 
+**The grid is two weights, and the whole canvas is ruled by it.** A hairline every five minutes in
+`--grid-minor`, a rule every fifteen in `--grid-major`, drawn by the lanes *and* by both bands from
+the same window and the same plot edges — a dose with no time under it is not on a shared timeline.
+Horizontally each lane is ruled every `gridStep`, which is per metric and must divide the half-span,
+because the three heavier rules are the floor, the midpoint and the ceiling. A time label only ever
+sits on a major rule; thinning them on a narrow canvas multiplies the quarter hour rather than
+stepping through the ticks. `--grid-major` is also the lane separator, and it is the ceiling on
+chrome: nothing that is not data may be darker.
+
 **Lane colours never carry identity on their own.** Every lane has a permanent visible text label,
 which is what allows two of the four colours to sit below 3:1 contrast. Do not remove those labels.
 

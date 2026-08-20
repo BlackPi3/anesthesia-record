@@ -955,6 +955,58 @@ line to revert per site if it reads wrong on a real iPad.
 
 ---
 
+## 2026-08-20 — Two grid weights, and the grid runs under the bands as well
+
+Item 6 of the `DESIGN.md` conversion list. One grey was doing three jobs — five-minute lines,
+half-hour lines, value rules and the boundary between two lanes — separated only by half a pixel of
+stroke width, and the canvas read flat because nothing on it was structural.
+
+**Vertically: a hairline every five minutes, a rule every fifteen.** `MAJOR_INTERVAL_MS` in
+`catalog.ts` is the quarter hour, and it is a multiple of `GRID_INTERVAL_MS` on purpose, so the two
+weights are one grid drawn in one pass rather than a second grid laid over the first. The
+half-hour emphasis it replaces was written as `GRID_INTERVAL_MS * 6` at the call site and was
+carried by stroke width alone, which is not a distinction anyone reads at 0.5px.
+
+**Time labels moved onto the major rules and nowhere else.** They used to be thinned by stepping
+through the five-minute ticks, so on a wide canvas they landed on 08:40 and 09:20 — times that
+carried a number but were drawn as hairlines. Now the label interval is a multiple of the quarter
+hour, so whatever carries a time is also drawn as a rule the eye can follow down the canvas, and a
+long case thins to the half hour rather than to an arbitrary tick.
+
+**Horizontally: rules every `gridStep`, with floor, midpoint and ceiling heavier and labelled.** A
+lane drew three rules, so between 40 and 140 there was nothing to read a heart rate against. The
+spacing is per metric in `catalog.ts` and is required to divide the half-span, because the three
+labelled rules are the floor, the midpoint and the ceiling and a spacing that steps past the
+midpoint would leave the one rule that carries a number floating between two hairlines.
+`scales.test.ts` asserts that for every lane.
+
+**Heart rate is ruled every 25, not every 10.** 10 is the rounder rhythm for a pulse and the only
+other divisor of the half-span, but at the lane's drawn height it puts a rule every seven pixels,
+which is texture rather than a grid. Fourth instance on this list of a figure in `DESIGN.md` naming
+something this app does not have: its "horizontal rules every 20, labelled every 40" describes the
+merged 30–190 pressure/rate grid of item 11, and applied to four narrow standalone bands — one of
+them six points wide, one of them three degrees — it has no meaning.
+
+**The grid now runs under the medication and event bands too, which is the largest part of what
+changed.** They had no time reference at all: a bolus tick sat in white space and its time could
+only be read by tracing up to the lanes. A shared timeline is the point of this product, and the
+bands already take the lanes' right edge for exactly this reason. `tests/protocol.spec.ts` asserts
+that a band's rules land on the same coordinates as a lane's, because the grid is now drawn from
+three places that each compute their own plot edges.
+
+**Row separators moved to `--grid-major`, and only the lanes have one.** A lane's bottom rule
+divides two bands of one canvas, so it should read heavier than what rules a lane and lighter than
+anything drawn inside one. The medication and event bands are already separated by their own
+headings and their entry buttons; adding a rule to each would box the canvas rather than divide it.
+
+**Not done here, and visible in the screenshots:** a phase milestone's dashed rule and a
+milestone's stem in the event band are both `--grid-major` at 1px, so they now sit at the same
+weight as a quarter-hour rule. The dash still tells them apart. Item 8 of the conversion list is
+where the milestones are dealt with as a whole, and pre-empting it here would be a second opinion
+on the same question.
+
+---
+
 ## Open decisions (not yet made)
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
