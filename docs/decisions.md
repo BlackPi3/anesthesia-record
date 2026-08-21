@@ -1490,6 +1490,23 @@ opens nothing, which is the new risk a 128px painted button never had. Every blo
 asserted to be contained in its spoken one, because that pair breaks silently when either half is
 edited alone.
 
+**Revised within the hour, on looking at it: the block wears a wash after all.** Painting nothing
+at rest made the six rows read as labels rather than as controls — the „+“ alone was not enough of
+an affordance, and there is no hover on the first form factor to supply the rest. So the name and
+its unit sit on `--accent` at 6% with a 6px radius, the same wash the old buttons wore and a
+quarter of their area.
+
+What makes this not a return to the painted box is that **the paint and the target are no longer
+the same rectangle.** The target is the whole 88×44 gutter; the painted face is `fit-content`, 38
+to 91px wide, and its padding is paid to the *left* of x=0 so the names stay on the record's left
+edge with „Uhrzeit“ instead of stepping in from it. The gutter's right half is where the axis
+numbers are, and a surface drawn under „38,0“ would read as though the number belonged to the
+control — which is exactly what the first attempt, a wash across the full 88, looked like. The
+tightest margin is „+ Temp“ against its own ceiling number at 6.7px, so `gutter.spec.ts` measures
+the gap on all four lanes rather than trusting it; with the face widened to the full gutter that
+test reports −21.8px on the saturation lane, checked rather than assumed. The focus ring hugs the
+face for the same reason: an 88px ring around a 48px control points at the wrong thing.
+
 **Two test bugs found on the way, both of the kind `CLAUDE.md` warns about.** The hit-area search
 matched `[aria-label="Temperatur erfassen"]` exactly, which stopped matching when the accessible
 name gained its abbreviation — a selector aimed at a string nothing checks. And the search window

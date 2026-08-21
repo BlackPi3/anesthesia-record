@@ -166,7 +166,9 @@ without leaving the entry layout.
 The left gutter is 88px and holds three things: the row's name, its unit, and the axis numbers
 right-aligned against the plot. It is also the control that opens that row's entry sheet — 88 by
 44, which is a larger touch target than the painted button it replaced and costs no height at all,
-because the gutter beside a name was empty space that answered nothing. That is what allows the
+because the gutter beside a name was empty space that answered nothing. The paint and the target
+are deliberately different rectangles: the name and unit sit on a light accent wash that hugs them,
+while the pressable area is the whole gutter, so the affordance never reaches the axis numbers. That is what allows the
 names to be abbreviated rather than dropped: „Sauerstoffsättigung“ is 119px and cannot share a
 gutter with a number, „SpO₂“ is 39px and can, and the full name is still what a screen reader is
 given. The 80px this saves over the previous 168 is about 12% more chart on an iPad. The one thing

@@ -94,8 +94,11 @@ not the whole `<svg>`.** The gutter on the left and the value rail on the right 
 furniture; a press on a parameter's name or on its current value is not a press on the chart.
 
 **The gutter is 88px and the row's name is what opens its entry sheet.** One block per row — the
-name, the unit, a „+“ in the accent — 88 wide by 44 tall, and there is no painted button anywhere
-on the record. The lane names are abbreviated (`short` in `catalog.ts`) because no arrangement of
+name, the unit, a „+“ in the accent, on a 6% accent wash — 88 wide by 44 tall, and there is no
+painted button anywhere on the record. **The paint and the target are not the same rectangle:** the
+target is the whole gutter, the painted face hugs its own name, because the gutter's right half
+belongs to the axis numbers and a surface drawn under one would read as though the number were part
+of the control. The lane names are abbreviated (`short` in `catalog.ts`) because no arrangement of
 the full ones fits under 162px; the full name stays in the accessible name, written first as the
 abbreviation so voice control and a screen reader agree. Nothing else may go in that gutter: it
 holds a name, a unit and the axis numbers, which is why the medication band's drug names are in

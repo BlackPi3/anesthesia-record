@@ -390,6 +390,11 @@ function EmptyRecord() {
  * The „+“ is decoration and marked as such: the accessible name already ends in „erfassen“, and
  * spoken in front of six of these it is noise.
  *
+ * The face is the part that is painted, and it is a separate element because it is not the same
+ * size as the target. The target is the whole gutter; the face hugs the name, because the gutter's
+ * right half belongs to the axis numbers and a surface drawn across them would read as though the
+ * number were part of the control.
+ *
  * `style` carries the width rather than the stylesheet, because that width is `GUTTER` — the same
  * number the plot's left edge is drawn from, and a second copy of it in CSS is a copy that can
  * disagree with the chart.
@@ -414,13 +419,15 @@ function GutterBlock({
       aria-label={label}
       onClick={onClick}
     >
-      <span className="timeline__gutter-name">
-        <span className="timeline__gutter-plus" aria-hidden="true">
-          +
+      <span className="timeline__gutter-face">
+        <span className="timeline__gutter-name">
+          <span className="timeline__gutter-plus" aria-hidden="true">
+            +
+          </span>
+          {name}
         </span>
-        {name}
+        {unit !== undefined && <span className="timeline__gutter-unit">{unit}</span>}
       </span>
-      {unit !== undefined && <span className="timeline__gutter-unit">{unit}</span>}
     </Button>
   )
 }

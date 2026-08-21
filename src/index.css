@@ -779,12 +779,15 @@ body {
  * with a painted 128x32 „Erfassen“ box beneath it. That column of boxes was the loudest repeated
  * element on a page whose ink is meant to be the data, and it was also what held the gutter at
  * 168px: the box was the widest thing in it. Both problems have the same answer. The gutter around
- * the name was already inert, so the name is the button, and all that is left of the box is a „+“
- * in the accent — the one colour this interface uses to say „you can press this“.
+ * the name was already inert, so the name is the button: the same wash the box wore, over a
+ * quarter of its area, with a „+“ in the accent — the one colour this interface uses to say „you
+ * can press this“.
  *
- * No painted surface at rest, on purpose. The affordance is the „+“, which is legible on a touch
- * screen where a hover state is not; the hover below is for the mouse and adds nothing the iPad
- * depends on.
+ * The target and the paint are not the same rectangle, and they cannot be. The target is the whole
+ * gutter, which is 88px; the paint is the `face`, which hugs the name, because the right half of
+ * that 88 is where the axis numbers are right-aligned and a surface drawn under „38,0“ would read
+ * as though the number belonged to the control. So the block below is the transparent 88x44, and
+ * everything visible is on the face.
  *
  * `width` is set in `Timeline.tsx` from `GUTTER`, because that is the same number the plot's left
  * edge is drawn from and two copies of it can disagree.
@@ -792,26 +795,58 @@ body {
 .timeline__gutter-block.ant-btn {
   position: absolute;
   left: 0;
-  /* 4px down, which puts the name's baseline on the lane's ceiling number — the two are one line
-     of reading, the name at the left of the gutter and the number at the right of it. */
-  top: 4px;
+  /* Flush with the top of its row. The face centres its two lines inside this 44px, which puts the
+     name's baseline on the lane's ceiling number — the two are one line of reading, the name at
+     the left of the gutter and the number at the right of it. */
+  top: 0;
   /*
    * 44px, the size `theme.ts` argues a fingertip reliably hits, and the whole width of the gutter.
-   * The painted button could never be this: measured, a 44px box hung 10.5px past the shortest
-   * lane's floor, so it stayed 32px and grew an invisible hit area instead. With nothing painted
-   * there is nothing to overflow — the block is the target.
+   * The old painted button could never be this: measured, a 44px box hung 10.5px past the shortest
+   * lane's floor, so it stayed 32px and grew an invisible hit area instead. Here the size that has
+   * to fit a lane is the face, which is smaller than the target rather than larger.
    */
   height: 44px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
+  /* AntD centres a button's content. Left, here: the face is narrower than the target it sits in,
+     and the names line up down the record's left edge with „Uhrzeit“ above them. */
   justify-content: flex-start;
-  gap: 1px;
   padding: 0;
   background: transparent;
   border-color: transparent;
   box-shadow: none;
   text-align: left;
+}
+
+/*
+ * The visible control: the name over its unit, on a wash of `--accent` at 6%.
+ *
+ * A wash and not a border, and 6% rather than a fill you would call a colour. The accent is the one
+ * thing in this interface that says „you can press this“, and six painted boxes down the left edge
+ * were once the loudest element on a record whose ink is meant to be the data — so this has to read
+ * as a control at a glance and lose to a trace at any other. It is there at rest, not on hover:
+ * the iPad is the first form factor, and a control whose only affordance is a hover state has no
+ * affordance there at all.
+ *
+ * It hugs its own text — `fit-content`, and its padding is paid to the left of x=0 rather than
+ * inside it, so the names stay on the record's left edge with „Uhrzeit“ rather than stepping in
+ * from it. 5px and not more: the widest face is „+ Medikament“ at 90.5, which leaves 2.5px between
+ * it and the plot, and the tightest gap is „+ Temp“ against the temperature lane's own ceiling
+ * number, which it clears by 6.7px.
+ */
+.timeline__gutter-face {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1px;
+  width: fit-content;
+  padding-inline: 5px;
+  margin-left: -5px;
+  border-radius: 6px;
+  /* `--accent` at 6%. Written as a literal rather than a `color-mix`, because it is the same
+     colour and this way it is one value with no runtime blending behind it. */
+  background: rgba(47, 75, 124, 0.06);
 }
 
 /*
@@ -824,18 +859,27 @@ body {
   background: transparent;
 }
 
-.timeline__gutter-block.ant-btn:not(:disabled):hover .timeline__gutter-name,
-.timeline__gutter-block.ant-btn:not(:disabled):active .timeline__gutter-name {
-  color: var(--accent);
+.timeline__gutter-block.ant-btn:not(:disabled):hover .timeline__gutter-face {
+  background: rgba(47, 75, 124, 0.11);
 }
 
+.timeline__gutter-block.ant-btn:not(:disabled):active .timeline__gutter-face {
+  background: rgba(47, 75, 124, 0.16);
+}
+
+/* The ring hugs what is painted rather than the whole target: a 88px outline around a 48px control
+   points at the wrong thing, and the target is not what a focused user is looking for. */
 .timeline__gutter-block.ant-btn:focus-visible {
+  outline: none;
+}
+
+.timeline__gutter-block.ant-btn:focus-visible .timeline__gutter-face {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 /* The row's name, at the weight and size the lanes drew it inside their own `<svg>`, so lifting it
-   into HTML is a change of element and not of design. */
+   into HTML was a change of element and not of design. */
 .timeline__gutter-name {
   font-size: 12px;
   font-weight: 600;

@@ -98,10 +98,12 @@ test('the target is 44px, the full width of the gutter, and inside its own lane'
   // The whole gutter, which is `GUTTER` in `Timeline.tsx` and the plot's left edge.
   expect(block.width).toBe(88)
 
-  // And it is bought entirely from this lane's own gutter. A target that ran past the lane's floor
-  // would be taking presses that belong to the Medikamente band below it.
+  // And it is bought entirely from this lane's own gutter. The block starts at the top of its own
+  // lane and ends 30px above its floor; a target that ran past that floor would be taking presses
+  // that belong to the Medikamente band below it. The pixel of tolerance at the top is the same
+  // hit-test rounding as above — the block's box begins at 645.9 and answers from 645.
   expect(edges.bottom).toBeLessThanOrEqual(lane.y + lane.height)
-  expect(edges.top).toBeGreaterThanOrEqual(lane.y)
+  expect(edges.top).toBeGreaterThanOrEqual(lane.y - 1)
 })
 
 test('the gutter below the block is still inert', async ({ page, hasTouch }) => {
@@ -137,6 +139,42 @@ test('a press on a point still selects it, and opens nothing', async ({ page, ha
 
   await expect(page.getByText(/HF 81 \/min/)).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+/**
+ * The paint stops before the axis numbers.
+ *
+ * The target is the whole 88px gutter; the painted face hugs its own name, because the right half
+ * of that 88 is where the numbers are right-aligned and a surface drawn under „38,0“ would read as
+ * though the number were part of the control. Which of the two a rule applies to is invisible in
+ * the source — both are inside the same button — and the margin is 6.7px at the tightest lane, so
+ * a change of face, of padding or of one abbreviation could close it without anything failing.
+ */
+test('the painted face never reaches the axis numbers', async ({ page }) => {
+  await page.evaluate(() => document.fonts.ready)
+
+  const gaps = await page.locator('.timeline__row').evaluateAll((rows) =>
+    rows
+      .map((row) => {
+        const face = row.querySelector('.timeline__gutter-face')
+        // The lane's own numbers: SVG text right-aligned inside the gutter. The bands have none,
+        // which is why they are allowed a face nearly the full width of it.
+        const numbers = [...row.querySelectorAll('svg text')].filter(
+          (text) => Number(text.getAttribute('x')) === 80 && text.getAttribute('text-anchor') === 'end',
+        )
+        if (!face || numbers.length === 0) return null
+        const right = face.getBoundingClientRect().right
+        const nearest = Math.min(...numbers.map((text) => text.getBoundingClientRect().left))
+        return { name: face.textContent, gap: nearest - right }
+      })
+      .filter((row) => row !== null),
+  )
+
+  // All four lanes, or the filter above is quietly measuring nothing.
+  expect(gaps).toHaveLength(4)
+  for (const { name, gap } of gaps) {
+    expect(gap, `„${name}“ is ${gap.toFixed(1)}px from its own axis numbers`).toBeGreaterThan(4)
+  }
 })
 
 /**
