@@ -690,6 +690,29 @@ enough to re-read.
 
 ---
 
+## A leftover preview server made a fixed test go on failing
+
+Chasing a Playwright failure whose selector was demonstrably present in the source, in `dist`, and
+in a screenshot taken minutes earlier. `document.querySelectorAll('.timeline__gutter-head')` came
+back empty in the browser; the class was in the built CSS and the built JS. Killing whatever held
+port 5199 and running again returned 1, with no change to any file.
+
+`playwright.config.ts` sets `reuseExistingServer: !process.env.CI`, which is the right setting —
+without it every local run pays a full build. What it means, though, is that **the server a run
+attaches to is not necessarily the one that run would have built.** `npm run videos` and `npm run
+e2e` both start `npm run build && npm run preview`, and a server left alive by an earlier command
+keeps serving whatever `dist` looked like when it started. The suite then tests old code and
+reports it as a failure of new code.
+
+The general shape is one `CLAUDE.md` already names — *the cause is not always the change that
+revealed it* — with a specific tell worth keeping: **when the evidence in the repository and the
+evidence in the browser disagree, stop debugging the code and check what is actually being
+served.** `lsof -ti:5199` answers it in a second.
+
+It also cost about twenty minutes of edits to a test that had been correct the whole time.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional
