@@ -62,8 +62,8 @@ The domain layer holds the case and entry types, the vital/event catalogue with 
 and ranges, the local-storage persistence layer, and a fictional demo case.
 
 99 unit tests cover the domain layer, the keypad's typing rules, and the timeline's coordinate and
-label-placement maths. 90 Playwright tests run across desktop Chrome, an iPad-sized viewport with
-touch, and WebKit — 265 runs in all, of which 10 are skipped by design: the stories are recorded
+label-placement maths. 99 Playwright tests run across desktop Chrome, an iPad-sized viewport with
+touch, and WebKit — 291 runs in all, of which 11 are skipped by design: the stories are recorded
 once on Chromium, and the touch gestures can only be driven there.
 
 ## Data model
