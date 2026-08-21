@@ -852,6 +852,43 @@ body {
   top: 40px;
 }
 
+/*
+ * The hit area is 44px. The painted box stays 32px.
+ *
+ * `theme.ts` argues that 44px is the size a fingertip reliably hits and calls AntD's 32px a
+ * mouse-era size, and then the rule above overrides the six most-used controls on the record back
+ * to 32px. The brief's Part 2 opens by asking for large, reliable touch targets, so this was the
+ * one place in the app where the theme contradicted its own argument.
+ *
+ * Painting a 44px button is what the contradiction asks for and it does not fit: measured at a
+ * 1080x810 viewport, 40 -> 84 is 10.5px past the temperature lane's plot floor and 10px outside
+ * its `<svg>`, so the shortest lane's button would hang over the Medikamente band. Moving it up
+ * instead collides with the unit's baseline at y=38.
+ *
+ * So the box keeps its size and only the target grows, asymmetrically, into gutter the lane is not
+ * using. Measured at that viewport, the target then runs from y=30.0 to y=74.0 in the lane's own
+ * coordinates: 43.98px tall, ending on the temperature lane's floor rather than past it. A
+ * symmetric expansion to the same height would reach into the next row.
+ *
+ * The insets are not the differences you would expect from those two numbers, because the button
+ * carries a 1px border and an absolutely positioned pseudo-element is laid out against the padding
+ * box inside it. -10px and -3px are the pair that measures right, and `gutter.spec.ts` measures it
+ * rather than trusting the arithmetic. Horizontally the target stays at x 0-128, keeping the same
+ * 6px of clearance from the axis numbers, which are right-aligned from x=160 and reach in to
+ * x=134.
+ *
+ * This is safe because the gutter is not the lane surface. `CLAUDE.md` says so — the gutter and
+ * the value rail are the lane's furniture — and it was checked rather than assumed: a press on the
+ * lane's name, on its unit, or on empty gutter does nothing today, and only a press on the plot
+ * switches how the lane reads. The expansion claims dead space and takes nothing from the four
+ * gestures. `tests/gutter.spec.ts` is what holds that, because a handler cannot be read for it.
+ */
+.timeline__add--gutter::after {
+  content: '';
+  position: absolute;
+  inset: -10px 0 -3px;
+}
+
 /* The bands' buttons are in the flow: their gutters hold each row's drug name, so there is no
    empty column to put one in. */
 .timeline__band + .timeline__add {

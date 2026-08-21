@@ -1223,6 +1223,52 @@ touchscreen nothing marks it as pressable.
 
 ---
 
+## 2026-08-21 — The „Erfassen“ button is painted 32px and answers to 44px
+
+**Supersedes the last paragraph of *The six „Erfassen“ buttons wear the accent* above**, which
+recorded the 32px height as known and left it for a decision. This is the decision.
+
+**What:** the painted box is unchanged. `.timeline__add--gutter::after` adds a transparent
+`inset: -10px 0 -3px`, which makes the target 43.98px tall — 44px to within subpixel layout —
+running from y=30.0 to y=74.0 in the lane's own coordinates. Nothing on the page moves or changes
+colour.
+
+**Why:** `theme.ts` sets `Button: { controlHeight: 44 }` and argues that 44px is the size a
+fingertip reliably hits, calling AntD's 32px "a mouse-era size"; `index.css` then cuts the six most
+pressed controls on the record back to 32. The brief's Part 2 opens with *"Large, reliable touch
+targets and precise mouse interaction."* This was the only place in the app where the theme
+contradicted its own argument, and it was the one real defect the clause-by-clause brief audit
+found.
+
+**Why not simply paint it at 44px.** Measured at a 1080×810 iPad viewport, every lane's button is
+`top 40, bottom 72` in its lane's `<svg>`, and the lanes are 92, 92, 129 and 74px tall. Growing the
+box downwards puts the temperature lane's button 10.5px past its plot floor and 10px outside its
+`<svg>`, hanging over the Medikamente band; growing it upwards collides with the unit's baseline at
+y=38. A symmetric hit area reaches into the next row for the same reason. So the expansion is
+asymmetric, and the temperature lane — the shortest — is what it is cut to.
+
+**Why this is safe, which is the part that was actually checked.** `CLAUDE.md` is strict about the
+lane surface: four gestures, and anything new there must say what the other four must not do. The
+gutter is not that surface — the rulebook already calls the gutter and the value rail the lane's
+furniture — and rather than trust that, presses were scripted at the lane's name, at its unit, and
+at empty gutter below the button. All three are inert; only a press on the plot changes anything.
+The expansion claims dead space and takes nothing from any of the four.
+
+**Proven by gesture, not by reading**, in `tests/gutter.spec.ts`: a press 6px above the painted box
+opens that lane's entry sheet; the target measures 44px and ends on the temperature lane's floor
+rather than past it; a press on the plot still switches how the lane reads and opens nothing; a
+press on a point still selects it. The two edges are found by binary search with
+`elementFromPoint`, because the insets are not the arithmetic you would predict — the button
+carries a 1px border and an absolutely positioned pseudo-element lays out against the padding box
+inside it, so the pair that measures right is -10 and -3. With the expansion removed, the first two
+fail and the last two pass, checked rather than assumed.
+
+**Why this one and not the other outstanding items:** it changes nothing visible, so it does not
+re-stale the seven story videos. That is what separated it from the gutter width, the pressure-lane
+question and the „Jetzt“ button on submission day.
+
+---
+
 ## Open decisions (not yet made)
 
 - **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say
