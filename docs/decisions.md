@@ -1456,6 +1456,58 @@ The band now keeps one height whether or not it has events, because it carries i
   factor's width, at the cost of a design decision made in a hurry and seven videos re-recorded, is
   not a trade worth making on the last day.
 
+  **Proposal for the next session, 2026-08-21: the row label *is* the button, and the names are
+  abbreviated.** This is the "more creative way" the 168px was sent back for, and it is written to
+  be implemented rather than debated.
+
+  *Measured, in the shipped face at the sizes the gutter actually uses:*
+
+  | | width |
+  |---|---|
+  | „Sauerstoffsättigung“ 13px/600 | **119.1px** |
+  | longest abbreviation, „Temp“ | **33.3px** |
+  | longest unit, „mmHg“ 12px/400 | **35.8px** |
+  | longest axis number, „38,0“ 11px | **22.8px** |
+
+  Those numbers decide it. `35.8 + 12 gap + 22.8 + 8 pad = 78.6`, so **an 80px gutter fits an
+  abbreviated name, its unit and its axis numbers side by side with 13px of clearance.** The full
+  names cannot be made to fit at any width worth having: `119.1 + 12 + 22.8 + 8 = 162`, which is
+  the 168 we already have. **Abbreviating is not a nicety here, it is the enabling move.**
+
+  1. **Names become „SpO₂“, „HF“, „RR“, „Temp“** — the vocabulary a paper Narkoseprotokoll already
+     uses, not invented German. The full name stays in the accessible name and in the entry sheet's
+     title, so nothing is lost to a screen reader. This does thin the permanent text label that
+     `CLAUDE.md` requires so colour never carries identity alone — an abbreviation is still a text
+     label, and that is the judgement to make deliberately rather than by accident.
+  2. **The painted 128×32 button disappears.** The gutter block — name, unit, and a „+“ glyph in
+     `--accent` — becomes the control. This is the logical end of the hit-area change of the same
+     day: that expanded the target into gutter that was proven inert, and this says the inert space
+     *was* the button all along. It costs no height, and it removes the six painted boxes that
+     *The six „Erfassen“ buttons wear the accent* already called the loudest repeated element on
+     the record.
+  3. **The gutter goes to 80px**, buying **88px of plot — about 13% on an iPad**, against the 68px
+     the 100px option was worth.
+
+  **The wrinkle that has to be solved with it, and it is the reason this is a session and not an
+  hour:** the medication band's gutter holds each row's drug name („Ringer-Acetat“ and friends),
+  and those do not fit in 80px. Either the drug name moves into the plot beside its own bar, where
+  the dose already sits and where `timeline__halo` now makes text legible over the grid, or the
+  band keeps a wider gutter than the lanes — which breaks the single left edge that makes the lanes
+  and the bands one timeline, and is therefore not an option. **Plan on moving the drug name.**
+
+  **What has to be proven, by scripted gesture and not by reading:**
+  - A press on the gutter block opens that row's entry sheet; a press on the plot still switches
+    how the lane reads; a press on a point still selects it; a hold-and-drag still corrects it.
+    `gutter.spec.ts` already holds four of these and is the place to extend.
+  - A **drag** that starts in the gutter scrolls the record and opens nothing. This is the new risk
+    the painted button never had, because the target is now the size of the whole gutter block.
+  - Every lane is at least 74px tall, so a 44px target still fits; assert it rather than assume it.
+
+  **Rejected on the measurements, so they are not re-proposed:** a round „+“ beside a full name
+  (`119 + 8 + 32 = 159`, saves nothing); moving axis numbers into the plot (they would sit over
+  data and are already the smallest type on the canvas); a hover-only affordance (there is no hover
+  on the first form factor).
+
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
   entries sharing the timestamp the user set; the chart draws them as paired chevrons on one stem
   and labels them as one box. What is still open is what the *trend* reading of that lane should
