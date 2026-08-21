@@ -119,3 +119,69 @@ test('a press on a point still selects it, and opens nothing', async ({ page, ha
   await expect(page.getByText(/HF 81 \/min/)).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
+
+/**
+ * The two bands' buttons do not move when their band fills.
+ *
+ * They used to. The heading was drawn inside the band's own `<svg>` and the button sat in the flow
+ * beneath it, so every drug added pushed „+ Medikament“ further from the „Medikamente“ it belongs
+ * to. This is the invariant that replaced it, and it is worth a test rather than a screenshot
+ * because it is a property of the record with data in it, not of the record as it first renders:
+ * the button that adds the sixth drug has to be where the button that added the first one was.
+ *
+ * Measured in page coordinates, not `boundingBox()`. A viewport-relative y answers a different
+ * question — it moves when the page scrolls, and opening and closing the sheet is exactly the kind
+ * of thing that scrolls it. Written that way the test failed against the old layout for two
+ * reasons at once, only one of which was the defect.
+ */
+async function pagePosition(page: Page, selector: string) {
+  return page.evaluate((css) => {
+    const box = document.querySelector(css)!.getBoundingClientRect()
+    return { top: box.top + window.scrollY, left: box.left + window.scrollX, height: box.height }
+  }, selector)
+}
+
+const MED_HEADING = '.timeline__section-name'
+const MED_BUTTON = '.timeline__section .timeline__add--section'
+
+test('the button that adds a medication stays with its heading as the band fills', async ({
+  page,
+}) => {
+  const offsetFromHeading = async () => {
+    const heading = await pagePosition(page, MED_HEADING)
+    const button = await pagePosition(page, MED_BUTTON)
+    return { gap: button.top - heading.top, left: button.left }
+  }
+
+  const before = await offsetFromHeading()
+  const bandBefore = await pagePosition(page, '[aria-label="Medikamente und Infusionen"]')
+
+  await page.getByRole('button', { name: 'Medikament erfassen' }).click()
+  const sheet = page.getByRole('dialog')
+  await sheet.getByRole('button', { name: 'Fentanyl' }).click()
+  await sheet.getByRole('button', { name: '5' }).first().click()
+  await sheet.getByRole('button', { name: 'Übernehmen' }).click()
+  await expect(page.getByText(/^Gespeichert /)).toBeVisible()
+  // Scoped to the band. Unscoped this matches the sheet as well, which is still in the DOM while
+  // it animates closed, and a strict locator with two matches fails on timing rather than on
+  // anything this test is about.
+  await expect(
+    page.locator('[aria-label="Medikamente und Infusionen"]').getByText('Fentanyl'),
+  ).toBeVisible()
+
+  // The band really is one row taller — without this the rest asserts nothing.
+  const bandAfter = await pagePosition(page, '[aria-label="Medikamente und Infusionen"]')
+  expect(bandAfter.height).toBeGreaterThan(bandBefore.height)
+
+  // And the button has not moved relative to the heading it belongs to. Measured against the
+  // heading rather than against the page, because the page above is allowed to move: the header
+  // gains „Gespeichert 09:xx“ on the first save and grows by about a pixel, which is a real change
+  // and not this one. What must not move is the button away from its own name.
+  const after = await offsetFromHeading()
+  expect(after.gap).toBe(before.gap)
+  expect(after.left).toBe(before.left)
+
+  // The band is underneath it, so filling the band cannot reach it — which is the whole fix.
+  const button = await pagePosition(page, MED_BUTTON)
+  expect(button.top).toBeLessThan(bandAfter.top)
+})

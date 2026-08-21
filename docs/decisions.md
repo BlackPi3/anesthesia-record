@@ -1305,6 +1305,41 @@ which is a cosmetic regression and not a silent data defect.
 
 ---
 
+## 2026-08-21 — Each band's heading and button sit above it, not under it
+
+**What:** „Medikamente“ and „Ereignisse“ are no longer `<text>` inside their band's `<svg>`. Each is
+an `<h3>` in a row above the band, with that band's „Erfassen“ button stacked directly beneath it,
+left-aligned at the same x as the four lanes' buttons. The bands lose their internal 24px heading
+strip and gain 6px of padding, so the record is no taller than it was.
+
+**Why:** a band grows downwards as it fills, and the button was in the flow underneath it. Every
+drug added pushed „+ Medikament“ 34px further from the „Medikamente“ it belongs to — on a long case
+far enough to be off the screen, which is the one thing the record's primary action cannot be.
+„+ Ereignis“ had the same distance permanently, because the event band reserves two label rows
+whether or not anything is in them.
+
+**Why this position and not another.** The four lanes never had the problem: their button is pinned
+to the top of the gutter, level with the lane's own name. A band's gutter is *not* empty — it holds
+each row's drug name — which is what put the button below the band in the first place, and is
+recorded in the rule this supersedes. Above the band is the same relationship in the only place a
+band has room for it.
+
+**Stacked, not side by side.** Both were tried and looked at. Side by side is more compact, and it
+puts the two bands' buttons 118px in from the edge, breaking the column of six „+“ glyphs that
+*The six „Erfassen“ buttons wear the accent* set out to create — for a third of the record. Stacked,
+all six line up and each sits under its own name, which is what a lane already does.
+
+**Proven by a test, because it is a property of the record with data in it**, not of the record as
+it first renders: `gutter.spec.ts` adds a bolus and asserts the button has not moved relative to its
+heading. Against the old layout it fails by exactly 34px, one medication row.
+
+**The measurement is heading-relative on purpose.** Written against absolute page coordinates it
+failed for a second reason as well: the header gains „Gespeichert 09:xx“ on the first save and grows
+about a pixel, moving everything below it. That is a real change and not this one — what must not
+move is the button away from its own name.
+
+---
+
 ## Open decisions (not yet made)
 
 - **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say

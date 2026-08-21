@@ -94,6 +94,10 @@ const LANE_INSET = 12
 const LANE_BASE_HEIGHT = 92
 const AXIS_HEIGHT = 30
 const MED_ROW_HEIGHT = 34
+/** Breathing room at the top and bottom of a band, now that its heading is a row of HTML above. */
+const BAND_PAD = 6
+/** An empty band is a ruled strip: enough to read as a section with nothing in it yet. */
+const BAND_EMPTY_HEIGHT = 24
 /**
  * The medication band's two marks, from the paper protocol: a bolus is a vertical tick at its
  * time, an infusion a thin rule spanning the period it ran, serifed at each end.
@@ -279,21 +283,32 @@ export function Timeline({ record, onCorrect, onRemove, onEdit, onAdd }: Timelin
             </div>
           ))}
 
+          {/* Heading and button on one row, above the band rather than under it. A band grows
+              downwards as it fills, so a button in the flow beneath it moved further from its own
+              heading with every drug added — on a long case it ends up off the screen entirely.
+              The lanes never had this problem: theirs is pinned to the top of the gutter. This is
+              the same position, in the only place a band has room for it. */}
+          <div className="timeline__section">
+            <h3 className="timeline__section-name">Medikamente</h3>
+            <AddButton
+              className="timeline__add timeline__add--section"
+              label="Medikament"
+              name="Medikament erfassen"
+              onClick={() => onAdd({ kind: 'medication' })}
+            />
+          </div>
           <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
-          <AddButton
-            className="timeline__add"
-            label="Medikament"
-            name="Medikament erfassen"
-            onClick={() => onAdd({ kind: 'medication' })}
-          />
 
+          <div className="timeline__section">
+            <h3 className="timeline__section-name">Ereignisse</h3>
+            <AddButton
+              className="timeline__add timeline__add--section"
+              label="Ereignis"
+              name="Ereignis erfassen"
+              onClick={() => onAdd({ kind: 'event' })}
+            />
+          </div>
           <EventBand width={width} window={window} events={events} onEdit={onEdit} />
-          <AddButton
-            className="timeline__add"
-            label="Ereignis"
-            name="Ereignis erfassen"
-            onClick={() => onAdd({ kind: 'event' })}
-          />
 
           {visibleEntries(record).length === 0 && <EmptyRecord />}
         </>
@@ -1644,10 +1659,11 @@ function MedicationBand({
   onEdit: (id: string) => void
 }) {
   const rows = medications(record)
-  // The band stays when it is empty, down to its heading. It is what the button beneath it is
-  // labelled by, and on a record with nothing in it the six headings are the six things this
-  // protocol can hold — which is more use than four lanes and two loose buttons.
-  const height = rows.length * MED_ROW_HEIGHT + 28
+  // The heading is HTML now, in the row above, so the band is only its rows. An empty band keeps a
+  // ruled strip rather than collapsing: on a record with nothing in it the six headings are the
+  // six things this protocol can hold, and a heading over nothing at all reads as a rendering
+  // fault rather than as an empty section.
+  const height = rows.length === 0 ? BAND_EMPTY_HEIGHT : rows.length * MED_ROW_HEIGHT + BAND_PAD * 2
   const scale = createLaneScales(
     { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
@@ -1662,14 +1678,10 @@ function MedicationBand({
       role="group"
       aria-label="Medikamente und Infusionen"
     >
-      <TimeGrid scale={scale} window={window} top={24} bottom={height} />
-
-      <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
-        Medikamente
-      </text>
+      <TimeGrid scale={scale} window={window} top={0} bottom={height} />
 
       {rows.map((entry, index) => {
-        const y = 28 + index * MED_ROW_HEIGHT + MED_ROW_HEIGHT / 2
+        const y = BAND_PAD + index * MED_ROW_HEIGHT + MED_ROW_HEIGHT / 2
         // The drug goes in the gutter, where every row aligns; the dose rides beside its own
         // mark. Putting both in the gutter is what clipped the longer names.
         const dose =
@@ -1794,8 +1806,10 @@ function EventBand({
   events: PhaseEventEntry[]
   onEdit: (id: string) => void
 }) {
-  // Kept when empty for the reason the medication band is: it heads the button below it.
-  const height = events.length === 0 ? 24 : 24 + EVENT_ROW_HEIGHT * 2
+  // Kept when empty for the reason the medication band is: an empty section still says the record
+  // can hold one.
+  const height =
+    events.length === 0 ? BAND_EMPTY_HEIGHT : BAND_PAD * 2 + EVENT_ROW_HEIGHT * 2
   const scale = createLaneScales(
     { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
@@ -1810,16 +1824,12 @@ function EventBand({
       role="group"
       aria-label="Ereignisse"
     >
-      <TimeGrid scale={scale} window={window} top={24} bottom={height} />
-
-      <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
-        Ereignisse
-      </text>
+      <TimeGrid scale={scale} window={window} top={0} bottom={height} />
 
       {events.map((event, index) => {
         const x = scale.map(event.at)
         const row = index % 2
-        const y = 30 + row * EVENT_ROW_HEIGHT
+        const y = BAND_PAD + row * EVENT_ROW_HEIGHT
         // Milestones near the end of a case (discharge, above all) would print past the edge, so
         // their labels flip to the left of the marker.
         const flip = x + 130 > plotRight(width)
@@ -1827,7 +1837,7 @@ function EventBand({
 
         return (
           <Fragment key={event.id}>
-            <line x1={x} x2={x} y1={24} y2={y + 8} stroke={chart.gridMajor} strokeWidth={1} />
+            <line x1={x} x2={x} y1={0} y2={y + 8} stroke={chart.gridMajor} strokeWidth={1} />
             <circle cx={x} cy={y + 8} r={4} fill={chart.inkMuted} />
             <text
               className="timeline__halo"
