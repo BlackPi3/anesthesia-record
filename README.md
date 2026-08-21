@@ -386,6 +386,21 @@ Scope decisions, with the reason each one was made.
 - **Verification on physical iPad hardware is a separate step** that emulation does not replace.
   The WebKit project runs the suite in the engine Safari uses, at an iPad viewport, with touch —
   which is the closest a machine can get and is not the same thing as a finger on glass.
+- **The desktop layout is the iPad layout with more room, not a denser one.** There is exactly one
+  media query in the app and it is inside the entry sheet, at 700px, where a stacked form was
+  taller than an iPad in landscape. The record itself is fluid: the chart measures its container
+  and takes the width it is given, and the case header reflows from three lines at 1080px to two at
+  1280px. So the two form factors differ in how much chart there is and how the header wraps — but
+  a desktop never shows *more* information than an iPad, only the same information at a wider
+  scale. The brief asks for "appropriate information density for both form factors", and this is
+  read as satisfying it; a second column of anything on a desktop would be a design decision about
+  what a desktop is for, and that decision was not made.
+- **In iPad portrait the header's two buttons take a line of their own.** At 810px wide „Rückgängig“
+  and „Demodaten zurücksetzen“ no longer fit beside the patient's name, so they wrap and sit
+  right-aligned between the name and the baseline data. It reads loosely — it is the one place in
+  the app where a control sits between two blocks of text that belong together. Landscape is the
+  orientation the app is designed for and the one the recordings use, and moving the actions would
+  change the header at every width to fix the narrowest one.
 - **Two things are still open.** The left gutter is 168px, sized so „Sauerstoffsättigung“ clears the
   axis numbers; narrowing it to 100px would buy about 68px of chart on an iPad but needs the lane
   name to go somewhere else first, and where is a design decision that has not been made. And the
