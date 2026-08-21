@@ -1373,6 +1373,47 @@ secret about the demo data.
 
 ---
 
+## 2026-08-21 — The phases lead the record, and every band carries a ruler
+
+**Supersedes *Each band's heading and button sit above it* from earlier today**, which put both
+bands' headings in a row of their own. That row is gone; this is where those two ended up.
+
+**What:** three changes to the order and furniture of the canvas.
+
+1. **Ereignisse moves from the foot of the record to directly under the time axis.** The dashed
+   phase rules already ran down through every lane; now they descend from their own labels, so
+   „Schnitt“ is readable where the vitals are being read instead of only at the bottom of the page.
+2. **The time axis is repeated above the medication band.** Same component, same window, same plot
+   edges, with „Uhrzeit“ dropped on the copy — the word needs saying once.
+3. **Both bands keep their heading and button in the gutter**, in the same column as the four
+   lanes. The event band can do this directly: its gutter holds nothing. The medication band's
+   gutter holds each row's drug name, so its heading and button sit in the gutter beside its
+   *ruler*, which is empty precisely because the repeat drops „Uhrzeit“.
+
+**Why (1):** the phases are the frame the case is thought about in, and „was ist der aktuelle
+Stand“ is the question a record gets asked first. It costs 64px above the vitals on an iPad, which
+is the whole argument against it, and that is bought back by (3).
+
+**Why (2):** the record is taller than an iPad, so the ruler scrolled away with the top of it —
+reading a dose meant scrolling up to find out what time the column under it was. A sticky axis was
+measured as the alternative and works, but needs `overflow-x: clip` on `.timeline` (the current
+`hidden` makes it its own scrollport, so `position: sticky` inside it silently does nothing) and
+the case header's height measured into a custom property, because the header is 130px at 1080 and
+shorter at 1280. Two lines of JSX against a runtime dependency between two components, on the last
+day. The repeat also survives print and appears in a screenshot, which a sticky header does not.
+
+**Why (3):** it answers the complaint that started this — a band grew downwards and its button went
+with it — without the row of its own that the superseded entry added, and it puts all six „+“
+glyphs back in one column. It also closes the unruled gap between Temperatur and the medication
+band that the separate heading row had opened: the record now runs ruler, phases, four lanes,
+ruler, drugs, with nothing between them that is not on the timeline.
+
+**Found by looking, not by reading:** collapsing the event band to its heading when empty left
+„+ Ereignis“ hanging over the saturation lane below — still clickable, no longer inside anything.
+The band now keeps one height whether or not it has events, because it carries its own button.
+
+---
+
 ## Open decisions (not yet made)
 
 - **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say

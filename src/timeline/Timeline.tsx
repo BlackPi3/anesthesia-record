@@ -255,6 +255,24 @@ export function Timeline({ record, onCorrect, onRemove, onEdit, onAdd }: Timelin
             </div>
           )}
           <TimeAxis width={width} window={window} />
+          {/* The phases lead the record. Their dashed rules already run down through every lane;
+              this is what puts a name on the top of each of those rules, so „Schnitt“ is readable
+              where the vitals are being read rather than only at the foot of the page. It is also
+              the order the case is thought about in: the milestones are the frame, and the vitals
+              and the drugs are what happened inside it. */}
+          <div className="timeline__row">
+            <EventBand width={width} window={window} events={events} onEdit={onEdit} />
+            {/* The lane pattern, not the band pattern. A band normally has to carry its heading
+                and button in a row above it because its gutter holds each row's drug name — the
+                event band's gutter holds nothing, so its button goes where a lane's goes: pinned
+                in the gutter, level with the heading, costing the record no height at all. */}
+            <AddButton
+              className="timeline__add timeline__add--gutter"
+              label="Ereignis"
+              name="Ereignis erfassen"
+              onClick={() => onAdd({ kind: 'event' })}
+            />
+          </div>
           {LANES.map((lane) => (
             // The wrapper is what the lane's own button is positioned against, which is why it is
             // here rather than inside `VitalLane`: an SVG cannot hold a real button, and the button
@@ -288,27 +306,25 @@ export function Timeline({ record, onCorrect, onRemove, onEdit, onAdd }: Timelin
               heading with every drug added — on a long case it ends up off the screen entirely.
               The lanes never had this problem: theirs is pinned to the top of the gutter. This is
               the same position, in the only place a band has room for it. */}
-          <div className="timeline__section">
-            <h3 className="timeline__section-name">Medikamente</h3>
-            <AddButton
-              className="timeline__add timeline__add--section"
-              label="Medikament"
-              name="Medikament erfassen"
-              onClick={() => onAdd({ kind: 'medication' })}
-            />
+          {/* The medication band cannot use the gutter beside it — that gutter holds each row's
+              drug name. The gutter beside its *ruler* is empty, though, because the repeats drop
+              the „Uhrzeit“ label. So the heading and the button go there: the same column as the
+              other five, costing the record no row of its own, and above the band rather than
+              below it, where filling the band cannot push them away. */}
+          <div className="timeline__row timeline__row--band">
+            <TimeAxis width={width} window={window} named={false} />
+            <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
+            <div className="timeline__gutter-head">
+              <h3 className="timeline__section-name">Medikamente</h3>
+              <AddButton
+                className="timeline__add timeline__add--gutter"
+                label="Medikament"
+                name="Medikament erfassen"
+                onClick={() => onAdd({ kind: 'medication' })}
+              />
+            </div>
           </div>
-          <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
 
-          <div className="timeline__section">
-            <h3 className="timeline__section-name">Ereignisse</h3>
-            <AddButton
-              className="timeline__add timeline__add--section"
-              label="Ereignis"
-              name="Ereignis erfassen"
-              onClick={() => onAdd({ kind: 'event' })}
-            />
-          </div>
-          <EventBand width={width} window={window} events={events} onEdit={onEdit} />
 
           {visibleEntries(record).length === 0 && <EmptyRecord />}
         </>
@@ -439,7 +455,26 @@ function useAxisTicks(window: TimeWindow, width: number) {
   return { times, labelInterval: MAJOR_INTERVAL_MS * every }
 }
 
-function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
+/**
+ * The ruler. It is drawn once at the top of the record and again above each band.
+ *
+ * The repeats exist because the record is taller than an iPad and the ruler scrolls away with the
+ * top of it: reading a dose or a milestone then meant scrolling back up to find out what time the
+ * column under it was. A copy above each band puts the answer beside the question. It is the same
+ * component from the same window and the same plot edges, so the three cannot disagree.
+ *
+ * `named` is false on the copies. „Uhrzeit“ says what the row is, and it needs saying once — three
+ * of it is the label competing with the thing it labels.
+ */
+function TimeAxis({
+  width,
+  window,
+  named = true,
+}: {
+  width: number
+  window: TimeWindow
+  named?: boolean
+}) {
   const { times, labelInterval } = useAxisTicks(window, width)
   const scale = createLaneScales(
     { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
@@ -454,9 +489,11 @@ function TimeAxis({ width, window }: { width: number; window: TimeWindow }) {
       role="img"
       aria-label={`Zeitachse von ${formatTime(window.from)} bis ${formatTime(window.to)}`}
     >
-      <text x={0} y={AXIS_HEIGHT - 9} fill={chart.inkMuted} fontSize={12} fontWeight={500}>
-        Uhrzeit
-      </text>
+      {named && (
+        <text x={0} y={AXIS_HEIGHT - 9} fill={chart.inkMuted} fontSize={12} fontWeight={500}>
+          Uhrzeit
+        </text>
+      )}
       {times.map((time) => {
         const x = scale.map(time)
         const major = time % MAJOR_INTERVAL_MS === 0
@@ -1807,9 +1844,12 @@ function EventBand({
   onEdit: (id: string) => void
 }) {
   // Kept when empty for the reason the medication band is: an empty section still says the record
-  // can hold one.
-  const height =
-    events.length === 0 ? BAND_EMPTY_HEIGHT : BAND_PAD * 2 + EVENT_ROW_HEIGHT * 2
+  // can hold one, and here it is also what the button in the gutter beside it is labelled by.
+  // One height, full or empty. The band carries its own button in the gutter beside it, pinned at
+  // the same y a lane's is, so it cannot be shorter than that button — an empty band collapsed to
+  // its heading left „+ Ereignis“ hanging over the saturation lane below, where it was still
+  // clickable and no longer inside anything.
+  const height = 24 + EVENT_ROW_HEIGHT * 2
   const scale = createLaneScales(
     { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
@@ -1824,12 +1864,16 @@ function EventBand({
       role="group"
       aria-label="Ereignisse"
     >
-      <TimeGrid scale={scale} window={window} top={0} bottom={height} />
+      <TimeGrid scale={scale} window={window} top={24} bottom={height} />
+
+      <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
+        Ereignisse
+      </text>
 
       {events.map((event, index) => {
         const x = scale.map(event.at)
         const row = index % 2
-        const y = BAND_PAD + row * EVENT_ROW_HEIGHT
+        const y = 30 + row * EVENT_ROW_HEIGHT
         // Milestones near the end of a case (discharge, above all) would print past the edge, so
         // their labels flip to the left of the marker.
         const flip = x + 130 > plotRight(width)
@@ -1837,7 +1881,7 @@ function EventBand({
 
         return (
           <Fragment key={event.id}>
-            <line x1={x} x2={x} y1={0} y2={y + 8} stroke={chart.gridMajor} strokeWidth={1} />
+            <line x1={x} x2={x} y1={24} y2={y + 8} stroke={chart.gridMajor} strokeWidth={1} />
             <circle cx={x} cy={y + 8} r={4} fill={chart.inkMuted} />
             <text
               className="timeline__halo"

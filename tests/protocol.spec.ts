@@ -36,7 +36,11 @@ test('draws one lane per vital parameter plus the bands', async ({ page }) => {
   // editing, so they hold interactive children and are no longer a picture of the data.
   await expect(page.getByRole('group', { name: 'Medikamente und Infusionen' })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Ereignisse' })).toBeVisible()
-  await expect(page.getByRole('img', { name: /Zeitachse von/ })).toBeVisible()
+  // Two rulers, not one: the record repeats the time axis above the medication band, because the
+  // copy at the top of the page scrolls away on an iPad and a dose with no readable time under it
+  // is the thing the shared timeline exists to prevent.
+  await expect(page.getByRole('img', { name: /Zeitachse von/ })).toHaveCount(2)
+  await expect(page.getByRole('img', { name: /Zeitachse von/ }).first()).toBeVisible()
 })
 
 /**

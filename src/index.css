@@ -890,31 +890,32 @@ body {
 }
 
 /*
- * A band's heading and its button, on one row above the band.
+ * A band's heading and button, stacked in the gutter beside it — the same place a lane keeps its
+ * name and button, and the same left edge, so all six „+“ glyphs line up in one column.
  *
  * They used to be apart: the heading was drawn inside the band's own `<svg>` and the button sat in
  * the flow underneath it. A band grows downwards as it fills, so every drug added pushed
  * „+ Medikament“ further from the „Medikamente“ it belongs to — on a long case far enough to be
- * off the screen, which is the one thing the record's primary action cannot be. „+ Ereignis“ had
- * the same distance permanently, because the event band reserves two label rows whether or not
- * anything is in them.
+ * off the screen, which is the one thing the record's primary action cannot be.
  *
- * The four lanes never had the problem: their button is pinned to the top of the gutter, level
- * with the lane's name. This is that position, in the only place a band has room for it — a band's
- * gutter is not empty like a lane's, it holds each row's drug name, which is what put the button
- * below the band in the first place. Above it, the two sit together and neither moves again.
+ * The event band did not need this: its gutter holds nothing, so its button is an ordinary
+ * `--gutter` one pinned beside its heading. The medication band's gutter holds each row's drug
+ * name, and this is the way around that — the gutter beside the band's *ruler* is empty, because
+ * a repeated ruler drops the „Uhrzeit“ label, and 54px of heading and button fit in it above the
+ * first drug row at y=75.
  */
-.timeline__section {
+.timeline__row--band {
+  margin-top: 12px;
+}
+
+.timeline__gutter-head {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: flex;
-  /* Stacked, not side by side: a lane reads name, unit, button down the left edge, and the six
-     „+“ glyphs line up in one column because of it — which the button restyle set out to do. Side
-     by side, the two bands' buttons would sit 118px in and break that column for a third of the
-     record. The heading it lost from inside the `<svg>` pays most of the height back. */
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  margin-top: 16px;
-  margin-bottom: 4px;
 }
 
 /* The same size and weight the heading had inside the `<svg>`, so lifting it into HTML is a change
@@ -925,21 +926,18 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
+  /* Matches the baseline the `<svg>` headings sit on, so the six row names line up across the
+     two ways they are drawn. */
+  line-height: 18px;
 }
 
-/*
- * The same 44px target the lanes' buttons were given, symmetric here because a row of its own has
- * room on both sides — the 16px above and the band's own padding below are empty. The lanes had to
- * take theirs asymmetrically to stay inside the shortest lane's `<svg>`.
- */
-.timeline__add--section {
+/* Not absolutely positioned: this one is stacked under its heading by the flex column above, so
+   it overrides the `--gutter` placement that the lanes rely on. The 44px target it carries is
+   the same. */
+.timeline__gutter-head .timeline__add--gutter {
   position: relative;
-}
-
-.timeline__add--section::after {
-  content: '';
-  position: absolute;
-  inset: -6px 0;
+  top: auto;
+  left: auto;
 }
 
 .case-header__actions {

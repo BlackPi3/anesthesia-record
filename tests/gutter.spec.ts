@@ -67,8 +67,12 @@ test('the target is 44px and ends inside its own lane', async ({ page }) => {
   // the asymmetric inset is cut to, and the only one where the two claims can both be tight.
   const edges = await page.evaluate(
     ([x, from, to]) => {
-      const answers = (y: number) =>
-        document.elementFromPoint(x, y)?.closest('.timeline__add') !== null
+      // Identity, not `closest('.timeline__add')`. Any-button was enough while this lane's
+      // neighbours were charts; the row below now carries the medication band's own button, and a
+      // search that accepts any of them walks straight out of the lane and reports a target half
+      // as tall again as it is.
+      const target = document.querySelector('[aria-label="Temperatur erfassen"]')
+      const answers = (y: number) => document.elementFromPoint(x, y)?.closest('button') === target
       // The painted box answers, so each search starts inside it and walks out to where it stops.
       // It returns the last point that still answered, not the midpoint of the final interval:
       // the furthest point that is provably inside the target, so a comparison against the lane's
@@ -141,8 +145,8 @@ async function pagePosition(page: Page, selector: string) {
   }, selector)
 }
 
-const MED_HEADING = '.timeline__section-name'
-const MED_BUTTON = '.timeline__section .timeline__add--section'
+const MED_HEADING = '.timeline__gutter-head .timeline__section-name'
+const MED_BUTTON = '.timeline__gutter-head .timeline__add'
 
 test('the button that adds a medication stays with its heading as the band fills', async ({
   page,
@@ -152,6 +156,11 @@ test('the button that adds a medication stays with its heading as the band fills
     const button = await pagePosition(page, MED_BUTTON)
     return { gap: button.top - heading.top, left: button.left }
   }
+
+  // The heading's own height settles when the webfont arrives — 17.06px in the fallback face,
+  // 18px in Plex — so a measurement taken before that races the font and reads a gap a pixel
+  // short of the one the record actually has.
+  await page.evaluate(() => document.fonts.ready)
 
   const before = await offsetFromHeading()
   const bandBefore = await pagePosition(page, '[aria-label="Medikamente und Infusionen"]')
