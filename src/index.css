@@ -772,10 +772,68 @@ body {
   position: relative;
 }
 
+/*
+ * Six of these run down the left edge, one per row, and they are the only repeated interactive
+ * chrome on the record. Left at AntD's default — a near-white fill inside a grey border — they
+ * were the loudest thing on the page: a column of boxes outlined at very nearly `--grid-minor`,
+ * which is to say drawn at the weight of the chart's own hairlines, and heavier than the lane
+ * names directly above them. A lane's name is what identifies the row, and it was losing to its
+ * own button.
+ *
+ * The box is dropped and `--accent` does the work instead. The accent is already declared as the
+ * one colour the interface uses to say „you can press this“, and this is the record's primary
+ * action, so it is the control that should be wearing it. A wash of the same accent stands in for
+ * the border: enough to read as a key at a glance, far too light to compete with a trace.
+ *
+ * The wash is there at rest and not only under a pointer, because the iPad is the first form
+ * factor and there is no hover on it. A control whose only affordance is a hover state is not an
+ * affordance on a touch screen.
+ *
+ * One width for all six and the label left-aligned, so the „+“ glyphs line up down the edge and
+ * the words line up behind them — a column instead of three ragged widths. 128px is the gutter
+ * clearance figure from the rule below, and the longest label („+ Medikament“) sits inside it.
+ */
 .timeline__add.ant-btn {
+  width: 128px;
   height: 32px;
-  padding-inline: 12px;
+  justify-content: flex-start;
+  padding-inline: 10px;
   font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  /* `--accent` at 7%. Written as a literal rather than a `color-mix`, because it is the same
+     colour and this way it is one value with no runtime blending behind it. */
+  background: rgba(47, 75, 124, 0.07);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/*
+ * `:not(:disabled)` is not idle: AntD injects its own `:hover` rules into the document after this
+ * stylesheet is parsed, so a selector of equal specificity loses to it. The extra pseudo-class is
+ * what makes these win, the same fight `src/entry/sheet.ts` documents.
+ */
+.timeline__add.ant-btn:not(:disabled):hover {
+  color: var(--accent);
+  background: rgba(47, 75, 124, 0.13);
+  border-color: transparent;
+}
+
+.timeline__add.ant-btn:not(:disabled):active {
+  color: var(--accent);
+  background: rgba(47, 75, 124, 0.2);
+  border-color: transparent;
+}
+
+.timeline__add.ant-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The „+“ is decoration and is marked `aria-hidden` in `Timeline.tsx`; it is set at the text
+   weight rather than the label's so it reads as a mark and the word reads as the action. */
+.timeline__add.ant-btn > [aria-hidden='true'] {
+  font-weight: 400;
 }
 
 /*
@@ -784,20 +842,23 @@ body {
  * — which is the one thing this button cannot afford to be ambiguous about. The 40px clears the
  * unit's baseline at y=35, and 32px of button clears the shortest lane's floor at 74px.
  *
- * Kept narrow so it stays clear of the axis numbers, which are right-aligned into the gutter from
- * x=160 and reach in about 30px.
+ * The 128px width is set with the other five in the rule above, and the figure comes from here:
+ * it is what keeps the button clear of the axis numbers, which are right-aligned into the gutter
+ * from x=160 and reach in about 30px.
  */
 .timeline__add--gutter {
   position: absolute;
   left: 0;
   top: 40px;
-  max-width: 128px;
 }
 
 /* The bands' buttons are in the flow: their gutters hold each row's drug name, so there is no
    empty column to put one in. */
 .timeline__band + .timeline__add {
-  display: block;
+  /* `flex`, not `block`: the button is a flex container and the rule above left-aligns its
+     contents, which a block box would discard. Block-level either way, so it still takes its own
+     line under the band. */
+  display: flex;
   margin-top: 4px;
 }
 

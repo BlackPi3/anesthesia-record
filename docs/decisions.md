@@ -1179,6 +1179,50 @@ working recovery as broken. It now corrupts once through `page.evaluate`. The te
 
 ---
 
+## 2026-08-21 — The six „Erfassen“ buttons wear the accent, not a box
+
+**What:** placement is unchanged from *The row is the button* above; this is the paint only. AntD's
+default button — a near-white fill inside a grey border — is replaced by a wash of `--accent` at
+7%, no visible border, the label in `--accent` at weight 600, one width of 128px for all six, and
+the label left-aligned so the „+“ glyphs and the words each line up down the edge.
+
+**Why:** three things, and the first is the one that shows in a screenshot. Six outlined boxes
+running down the left edge were the loudest repeated element on the record. Their border was
+`colorBorderSecondary`, which is `--grid-minor` — the chart's own hairline value — so each button
+was drawn at the weight of the ruling and was still heavier than the lane name directly above it.
+A lane's name is what identifies the row, and it was losing to its own button.
+
+Second, `theme.ts` already declares `--accent` to be the one colour the interface uses to say „you
+can press this“, and the record's primary action was wearing none of it. Third, the brief calls
+default component styling out as a negative, and apart from height, padding and font size these
+were AntD's defaults.
+
+**The wash is there at rest, not only under a pointer.** The iPad is the first form factor and
+there is no hover on it, so a control whose only affordance is a hover state has no affordance on
+half the target hardware. That is also why a plain text button was rejected.
+
+**Measured rather than read**, because a rule that loses to AntD fails silently: at rest the
+background computes to `rgba(47, 75, 124, 0.07)` and on hover to `0.13`, and all six boxes report
+`x=37, w=128, h=32`. The hover rule needs `:not(:disabled)` to outrank AntD's own, which is
+injected after this stylesheet and wins at equal specificity — the same fight `src/entry/sheet.ts`
+documents. The label measures **7.48:1** against the tinted ground, which clears even the 7:1 the
+design specification asks of numerals.
+
+**What was deliberately not changed: the 32px height.** The theme sets `Button` to 44px because
+that is the size a fingertip reliably hits, and this rule cuts these six back to 32. Raising it is
+not a paint change — the gutter comment fixes the geometry as 40px of clearance above the button
+and 32px of button clearing the shortest lane's floor at 74px — and it is entangled with the gutter
+width, which is an open decision below. A hit area larger than the painted box would reach into the
+lane's `<svg>`, and anything new on that surface has to say what the four gestures must not do and
+be proven by a scripted gesture. That is a change with a test attached, not a restyle, so it is
+recorded here as known and left for a decision.
+
+**Rejected:** a filled accent button — six solid blue blocks down the edge is a louder version of
+the problem, not a fix for it. A bare text button with no tint — quietest at rest, and on a
+touchscreen nothing marks it as pressable.
+
+---
+
 ## Open decisions (not yet made)
 
 - **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say
