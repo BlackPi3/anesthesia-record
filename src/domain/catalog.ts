@@ -260,18 +260,37 @@ export type LaneId = 'spo2' | 'heartRate' | 'bloodPressure' | 'temperature'
  */
 export interface LaneDef {
   id: LaneId
-  /** German label shown at the lane's edge. */
+  /** Full German name. The accessible name of the lane and the title of its entry sheet. */
   label: string
+  /**
+   * What the lane is called in its own gutter.
+   *
+   * The abbreviations a paper Narkoseprotokoll already uses, not invented German — which is what
+   * makes them a name rather than a truncation. They are what let the gutter be 88px wide:
+   * „Sauerstoffsättigung“ is 119.1px in the shipped face and cannot share a gutter with an axis
+   * number at any width worth having, where „Temp“, the longest of these, is 33.3px. The full name
+   * is still the lane's accessible name, so nothing is lost to a screen reader.
+   *
+   * A lane's short name is not always its first vital's: the pressure lane holds `RR sys`,
+   * `RR mit` and `RR dia`, and the lane they share is „RR“.
+   */
+  short: string
   vitals: readonly VitalKind[]
   /** Relative height. Lanes are sized in proportion to these, not in pixels. */
   weight: number
 }
 
 export const LANES: readonly LaneDef[] = [
-  { id: 'spo2', label: 'Sauerstoffsättigung', vitals: ['spo2'], weight: 1 },
-  { id: 'heartRate', label: 'Herzfrequenz', vitals: ['heartRate'], weight: 1 },
-  { id: 'bloodPressure', label: 'Blutdruck', vitals: BLOOD_PRESSURE_KINDS, weight: 1.4 },
-  { id: 'temperature', label: 'Temperatur', vitals: ['temperature'], weight: 0.8 },
+  { id: 'spo2', label: 'Sauerstoffsättigung', short: 'SpO₂', vitals: ['spo2'], weight: 1 },
+  { id: 'heartRate', label: 'Herzfrequenz', short: 'HF', vitals: ['heartRate'], weight: 1 },
+  {
+    id: 'bloodPressure',
+    label: 'Blutdruck',
+    short: 'RR',
+    vitals: BLOOD_PRESSURE_KINDS,
+    weight: 1.4,
+  },
+  { id: 'temperature', label: 'Temperatur', short: 'Temp', vitals: ['temperature'], weight: 0.8 },
 ]
 
 /**

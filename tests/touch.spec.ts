@@ -162,3 +162,26 @@ test('a tap reads a value without moving it', async ({ page }) => {
   expect(after.value).toBe(81)
   expect(after.revisions).toEqual([])
 })
+
+/**
+ * The gutter block is now the size of the whole gutter, which is a risk the painted button never
+ * had: 88 by 44 of the left edge, on the form factor where the left edge is also where a thumb
+ * rests while the record is scrolled. A swipe that starts on it has to scroll and open nothing.
+ *
+ * Nothing in `Timeline.tsx` implements this. It works because the block is a real `<button>` with
+ * an `onClick`, and a browser withholds the click when a touch turns into a scroll — the same
+ * property the bands' hit areas lean on, and the reason the lanes' grab is the only gesture on
+ * this canvas that had to resolve the ambiguity by hand. Leaning on it is fine; leaning on it
+ * untested is how it turns into a sheet that opens every time the record is scrolled.
+ */
+test('swiping from a lane\'s gutter block scrolls the record and opens nothing', async ({
+  page,
+}) => {
+  const block = (await page.getByRole('button', { name: 'Herzfrequenz erfassen' }).boundingBox())!
+  const from = { x: block.x + block.width / 2, y: block.y + block.height / 2 }
+
+  await swipe(page, from, { x: from.x, y: from.y - 200 })
+
+  await expect.poll(() => scrollY(page), { message: 'the page should have scrolled' }).toBeGreaterThan(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})

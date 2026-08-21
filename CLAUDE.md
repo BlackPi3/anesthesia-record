@@ -93,6 +93,14 @@ proven by a scripted gesture rather than by reading the handler. **"Empty chart"
 not the whole `<svg>`.** The gutter on the left and the value rail on the right are the lane's
 furniture; a press on a parameter's name or on its current value is not a press on the chart.
 
+**The gutter is 88px and the row's name is what opens its entry sheet.** One block per row — the
+name, the unit, a „+“ in the accent — 88 wide by 44 tall, and there is no painted button anywhere
+on the record. The lane names are abbreviated (`short` in `catalog.ts`) because no arrangement of
+the full ones fits under 162px; the full name stays in the accessible name, written first as the
+abbreviation so voice control and a screen reader agree. Nothing else may go in that gutter: it
+holds a name, a unit and the axis numbers, which is why the medication band's drug names are in
+the plot beside their own marks.
+
 **Touch requires a deliberate grab.** 250ms hold before a point becomes draggable, released if the
 finger moves more than 10px first. Mouse and pen drag immediately, keyed off
 `PointerEvent.pointerType`. `touch-action` is `pan-y` on the lane and `none` only while grabbed,
@@ -118,9 +126,9 @@ sits on a major rule; thinning them on a narrow canvas multiplies the quarter ho
 stepping through the ticks. `--grid-major` is also the lane separator, and it is the ceiling on
 chrome: nothing that is not data may be darker.
 
-**Lane colours never carry identity on their own.** Every lane has a permanent visible text label,
-and the Blutdruck lane tells its three pressures apart by marker shape. Do not remove either. This
-was originally a contrast concession — two of the four traces sat below 3:1 — and it is not one any
+**Lane colours never carry identity on their own.** Every lane has a permanent visible text label —
+abbreviated, never absent — and the Blutdruck lane tells its three pressures apart by marker shape.
+Do not remove either. This was originally a contrast concession — two of the four traces sat below 3:1 — and it is not one any
 more: since the six-value palette the four run 5.95:1 to 7.80:1 against the ground, as `theme.ts`
 records. The labels stay regardless, because a hue being legible is not a reason to make it carry a
 name.

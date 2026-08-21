@@ -177,7 +177,7 @@ test('says so when the record holds nothing yet', async ({ page }) => {
   await page.reload()
 
   await expect(page.getByText('Noch keine Einträge')).toBeVisible()
-  await expect(page.getByText(/„Erfassen“ an der jeweiligen Zeile/)).toBeVisible()
+  await expect(page.getByText(/„\+“ links an der jeweiligen Zeile/)).toBeVisible()
 
   // The lanes stay: an empty record is the chart before anything is written on it, not a
   // different screen.

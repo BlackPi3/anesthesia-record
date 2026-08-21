@@ -26,10 +26,11 @@ Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprot
 
 Everything the record holds can be written, corrected and removed, and the case survives a reload.
 
-- **Recording** starts on the row being written into: every lane and both bands carry their own
-  „Erfassen“ button. A single-metric lane opens straight on its value field; the blood pressure
-  lane opens one reading holding all three pressures; the medication and event bands still ask
-  which drug or which milestone first.
+- **Recording** starts on the row being written into, and the row's own name is what starts it:
+  „SpO₂“, „HF“, „RR“, „Temp“, „Ereignis“ and „Medikament“ each sit in the gutter with a „+“ and
+  open that row's entry sheet. A single-metric lane opens straight on its value field; the blood
+  pressure lane opens one reading holding all three pressures; the medication and event bands still
+  ask which drug or which milestone first.
 - **Values are typed**, on a keypad in the sheet — the number is already known from the monitor, so
   the shortest path to the record is its digits. A physical keyboard types into the same field, and
   `−` / `+` move an entered value by one step. The blood pressure sheet has one keypad and three
@@ -162,6 +163,16 @@ as configuration in `src/domain/catalog.ts`, so regrouping them is an edit to th
 Phase events are drawn as dashed rules through every lane, so the vitals at incision can be read
 without leaving the entry layout.
 
+The left gutter is 88px and holds three things: the row's name, its unit, and the axis numbers
+right-aligned against the plot. It is also the control that opens that row's entry sheet — 88 by
+44, which is a larger touch target than the painted button it replaced and costs no height at all,
+because the gutter beside a name was empty space that answered nothing. That is what allows the
+names to be abbreviated rather than dropped: „Sauerstoffsättigung“ is 119px and cannot share a
+gutter with a number, „SpO₂“ is 39px and can, and the full name is still what a screen reader is
+given. The 80px this saves over the previous 168 is about 12% more chart on an iPad. The one thing
+it displaced is the drug names in the medication band, which no longer fit beside their rows and
+now sit in the plot beside their own marks, where the dose already was.
+
 The chart reads two ways. Its normal state is a trace, which is what makes a trend visible; a tap
 on the chart itself drops the lines and writes every measured value beside its point, because a
 position on an axis is not a number. The labels carry the value alone — the unit is at the lane's
@@ -188,16 +199,17 @@ guess changed from reading to reading.
 Colours are the four categorical slots in fixed order, one per lane, validated for colour-vision
 separation against the surface. As graphics rather than text the floor that binds them is 3:1, and
 they run 5.95:1 (heart rate) to 7.80:1 (blood pressure), so all four clear it. Identity still never
-rests on hue: every lane carries a permanent text label, and within the Blutdruck lane the three
+rests on hue: every lane carries a permanent text label — abbreviated to fit an 88px gutter, but
+never absent — and within the Blutdruck lane the three
 pressures are told apart by marker shape (systolic points up, diastolic down, the mean is a dot) as
 on the paper protocol. That is no longer a contrast concession — it is how a clinician reads a
 protocol, and a hue being legible is not a reason to make it carry a name.
 
 ## Entering a value
 
-`src/entry/` holds the creation flow. Each row of the chart carries its own „Erfassen“ button, and
-that button is what says which entry is being made: a single-metric lane opens straight on the
-value field, with no picker in between. `src/entry/target.ts` is the whole of that mapping — what
+`src/entry/` holds the creation flow. Each row of the chart is opened from its own name in the
+gutter, and which row that is says which entry is being made: a single-metric lane opens straight
+on the value field, with no picker in between. `src/entry/target.ts` is the whole of that mapping — what
 a lane's button opens, and which two still need a list first.
 
 The sheet itself is a card rather than a screen: at most 880px wide, centred, bordered like every
@@ -347,8 +359,10 @@ What that looked like in practice:
 - **[`docs/learning.md`](docs/learning.md)** holds the bugs whose cause was not obvious — the ones
   where the change that revealed the fault was not the change that caused it.
 - **The standing rule was to present options, not to pick.** Anything hard to reverse came back as
-  a recommendation with trade-offs and waited. The gutter width in the section below is one that is
-  still waiting.
+  a recommendation with trade-offs and waited. The left gutter went through that loop twice: a
+  first proposal to narrow it was sent back for a better answer than paying a row of height per
+  lane, and the second — abbreviate the names, and make the name itself the control — was measured
+  before it was written and only then built.
 - **The failure mode worth naming** is agreeable-looking code that nobody can explain. Coordinate
   maths is where it hides, so `scales.ts` and `labels.ts` are pure functions tested with numbers,
   and the timeline is checked by interacting with it and screenshotting both form factors rather
@@ -408,9 +422,6 @@ Scope decisions, with the reason each one was made.
   failure by a long way. The blood pressure lane is where the limit bites first: one reading is a
   three-line box, and two of those closer together than about 95px near the edge of the window
   cannot both find a clear side. The demo case stays inside that limit deliberately.
-- **Two things are still open.** The left gutter is 168px, sized so „Sauerstoffsättigung“ clears the
-  axis numbers; narrowing it to 100px would buy about 68px of chart on an iPad but needs the lane
-  name to go somewhere else first, and where is a design decision that has not been made. And the
-  blood pressure lane still draws three trend polylines, where the symbol table implies each
-  reading should stand as its own paired chevrons. Both are recorded in `docs/decisions.md` under
-  open decisions rather than settled quietly.
+- **One thing is still open.** The blood pressure lane draws three trend polylines, where the
+  symbol table implies each reading should stand as its own paired chevrons. It is recorded in
+  `docs/decisions.md` under open decisions rather than settled quietly.

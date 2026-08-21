@@ -1414,99 +1414,96 @@ The band now keeps one height whether or not it has events, because it carries i
 
 ---
 
+## 2026-08-21 — The row's name is the button, and the gutter is 88px
+
+**Implements the proposal at the foot of the gutter entry under *Open decisions*, and supersedes
+its 80px with 88.** It also supersedes the last paragraph of *The „Erfassen“ button is painted 32px
+and answers to 44px* above: the painted box that entry cut a hit area around no longer exists, and
+the target it argued for is now the block itself.
+
+**What:** every row of the record — four lanes and both bands — carries one control in its gutter
+instead of a name with a painted 128×32 button under it. The block is the row's name, its unit, and
+a „+“ in `--accent`; it is 88px wide, 44px tall, and pressing anywhere in it opens that row's entry
+sheet. The lane names are abbreviated to „SpO₂“, „HF“, „RR“ and „Temp“, which `LANES` now carries as
+`short`. `GUTTER` drops from 168 to 88.
+
+**Why the abbreviation is the enabling move and not a nicety.** Measured in the shipped face at the
+sizes the gutter uses: „Sauerstoffsättigung“ is 119.1px, and with the widest axis number and its
+padding beside it that is 162 — which is the 168 we already had. The gutter is read at two x
+positions on one line, the name at the left and the number right-aligned to `GUTTER − 8`, so the
+width is the widest pair. At 88 the pairs that actually meet are „+ Temp“ (41.9) against „38,0“
+(26.4, from x=53.6) and „mmHg“ (35.8) against „220“ (19.8, from x=60.2): 11.7px and 24.4px of
+clearance. The abbreviations are what a paper Narkoseprotokoll already uses, so this is a shorter
+name and not a truncation, and the full name is still the block's accessible name and the entry
+sheet's title.
+
+**Why 88 and not the 80 that was proposed.** The proposal costed the names without the „+“ that now
+precedes each of them, which is 8.6px, and did not price the medication band's own name at all:
+„+ Medikament“ is 80.5px. At 80 the temperature lane cleared its ceiling number by 3.7px and
+„+ Medikament“ printed through the repeated ruler's first time label. Eight pixels buys both, and
+„Medikament“ stays a word — „Med.“ is shorthand for something the row has room to say. The change
+is still 80px of chart, about 12% more of it on an iPad.
+
+**Why the name is the button.** This is the end of the hit-area change made the same morning: that
+one expanded the target into gutter it had *proven inert* by scripted press, and the honest reading
+of a 44px target sitting in dead space is that the dead space was the button. Making it so costs no
+height, removes the six painted boxes that *The six „Erfassen“ buttons wear the accent* already
+called the loudest repeated element on the record, and gives a larger target than the box it
+replaces — 88×44 rather than 128×32 painted. The visible word „Erfassen“ goes with it, so the empty
+record now points at the „+“ instead.
+
+**The wrinkle, which is what made this a session rather than an hour:** the medication band's gutter
+held each row's drug name, and „Ringer-Acetat“ does not fit in 88px. Giving that band a wider gutter
+than the lanes was never an option — the single left edge is what makes the six rows one timeline —
+so the drug moved into the plot beside its own mark, joining the dose that was already there, as
+`drug dose` in one text run with `.timeline__halo` behind it. The band's block then moved down
+beside the band itself rather than beside the repeated ruler, because the ruler's first time label
+is centred on the plot's left edge and reaches 18px back into the gutter; the medication band's
+minimum height is 48px so that the block always has a band to sit beside.
+
+**Accessibility, deliberately and not by default.** The block is spoken as „SpO₂, Sauerstoffsättigung
+erfassen“: the written name first, so someone driving the interface by voice can say what they can
+see, then the full parameter, which is what a screen reader is owed. `CLAUDE.md`'s rule that colour
+never carries identity alone still holds — an abbreviation is still a permanent visible text label —
+but it is thinner than it was, and that is a judgement made deliberately rather than by accident.
+
+**Rejected, with what each was measured to cost**, carried over from the open decision this
+replaces so they are not proposed again:
+
+- *Leave it at 168.* Costs 80px of chart on the form factor with the least of it.
+- *100px with the full names*, which was Backlog §8 item 9 as written. „Sauerstoffsättigung“ at
+  y=20 against a ceiling number at y=16 overlaps by 44.3px, and the old button against the
+  temperature midpoint by 28.1px. The item was not a constant edit.
+- *Name and button on a row above each lane*, the shape the bands used to have. Makes all six rows
+  one shape and frees the gutter entirely, and costs a row of height per lane — roughly 96px over
+  four — on the iPad. That is the version this was sent back to improve on.
+- *Axis numbers inside the plot.* They would sit over data, and they are already the smallest type
+  on the canvas.
+- *A round „+“ beside a full name*: `119 + 8 + 32 = 159`, which saves nothing.
+- *A hover-only affordance.* There is no hover on the first form factor.
+
+**Proven by gesture, not by reading**, in `tests/gutter.spec.ts` and `tests/touch.spec.ts`: a press
+on the lane's own axis number opens its entry sheet; the target measures 44px and ends inside the
+shortest lane; the gutter below the block is still inert; a press on the plot still switches how the
+lane reads; a press on a point still selects it; a *swipe* from the block scrolls the record and
+opens nothing, which is the new risk a 128px painted button never had. Every block's written name is
+asserted to be contained in its spoken one, because that pair breaks silently when either half is
+edited alone.
+
+**Two test bugs found on the way, both of the kind `CLAUDE.md` warns about.** The hit-area search
+matched `[aria-label="Temperatur erfassen"]` exactly, which stopped matching when the accessible
+name gained its abbreviation — a selector aimed at a string nothing checks. And the search window
+was ±20px around the block's centre, which reports a 44px target as 40: the interval it searched
+was inside the target at both ends, so it measured itself.
+
+---
+
 ## Open decisions (not yet made)
 
-- **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say
-  why.** Taken on an iPad in landscape on 2026-08-21, at a 1080px viewport: the timeline element is
-  1040px and its `<svg>` 1006px. `GUTTER` (168) + `VALUE_COLUMN` (136) + `RIGHT_PAD` (24) = 328px of
-  furniture, leaving 678px of plot. At `GUTTER = 100` the plot becomes 746px — **+68px, about 10%**.
-
-  Two things collide at 100px, not one. The gutter is read at three x positions: the lane name and
-  unit at `x=0`, the axis numbers right-aligned to `GUTTER − 8`, and the „Erfassen“ button
-  absolutely positioned at `left: 0; top: 40px`.
-
-  1. **Name against the ceiling number.** „Sauerstoffsättigung“ measures 109.9px at `y=20`; the
-     ceiling number sits at `y=16`, the same line, and the widest is „38,0“ at 26.4px. At 168 the
-     numbers begin at 133.6 and clear the name by 23.7px. At 100 they begin at 65.6 — **44.3px of
-     overlap**.
-  2. **Button against the midpoint number.** The button measures 93.7px and spans `y` 40–72.
-     Temperature's midpoint „36,5“ sits at `y=41`. At 168 it begins at 133.6, clear by 39.9px. At
-     100 it begins at 65.6 — **28.1px of overlap**.
-
-  The options, with what each costs:
-
-  - **Name and button above the plot, as the bands already do it.** „Medikamente“ and „Ereignisse“
-    already carry their name on a row of their own with the button in the flow beneath, so this
-    makes all six rows one shape instead of two. The gutter would then hold only axis numbers and
-    could go well below 100. It costs a row of vertical height per lane — roughly 96px over four —
-    on the form factor with the least of it, which is the whole argument against.
-  - **Abbreviate the names** to „SpO₂“, „HF“, „RR“, „Temp“. Fits 100px with room and is established
-    vocabulary on a paper Narkoseprotokoll rather than invented German. It is the cheapest by a
-    long way. It does thin the permanent text label that lets colour not carry identity — an
-    abbreviation still carries a name, but a shorter one.
-  - **Leave the gutter at 168.** Costs the 68px and nothing else.
-  - **Rejected before it is offered:** moving the axis numbers inside the plot. They would then sit
-    over data, and the numbers are already the smallest type on the canvas.
-
-  **Recommendation:** leave it at 168 for the submission and take the first option if the fixed
-  px/min rework is ever done — it is far cheaper after that rework's step 1, which lifts the gutter
-  and the rail out of the SVG into HTML columns. The plan of 2026-08-21 makes the same point from
-  the other side: 7px/min is `DESIGN.md`'s number and assumes its 100px gutter, so **item 9 and the
-  choice of scale are one decision**, and the scale is not being built. Buying 10% of one form
-  factor's width, at the cost of a design decision made in a hurry and seven videos re-recorded, is
-  not a trade worth making on the last day.
-
-  **Proposal for the next session, 2026-08-21: the row label *is* the button, and the names are
-  abbreviated.** This is the "more creative way" the 168px was sent back for, and it is written to
-  be implemented rather than debated.
-
-  *Measured, in the shipped face at the sizes the gutter actually uses:*
-
-  | | width |
-  |---|---|
-  | „Sauerstoffsättigung“ 13px/600 | **119.1px** |
-  | longest abbreviation, „Temp“ | **33.3px** |
-  | longest unit, „mmHg“ 12px/400 | **35.8px** |
-  | longest axis number, „38,0“ 11px | **22.8px** |
-
-  Those numbers decide it. `35.8 + 12 gap + 22.8 + 8 pad = 78.6`, so **an 80px gutter fits an
-  abbreviated name, its unit and its axis numbers side by side with 13px of clearance.** The full
-  names cannot be made to fit at any width worth having: `119.1 + 12 + 22.8 + 8 = 162`, which is
-  the 168 we already have. **Abbreviating is not a nicety here, it is the enabling move.**
-
-  1. **Names become „SpO₂“, „HF“, „RR“, „Temp“** — the vocabulary a paper Narkoseprotokoll already
-     uses, not invented German. The full name stays in the accessible name and in the entry sheet's
-     title, so nothing is lost to a screen reader. This does thin the permanent text label that
-     `CLAUDE.md` requires so colour never carries identity alone — an abbreviation is still a text
-     label, and that is the judgement to make deliberately rather than by accident.
-  2. **The painted 128×32 button disappears.** The gutter block — name, unit, and a „+“ glyph in
-     `--accent` — becomes the control. This is the logical end of the hit-area change of the same
-     day: that expanded the target into gutter that was proven inert, and this says the inert space
-     *was* the button all along. It costs no height, and it removes the six painted boxes that
-     *The six „Erfassen“ buttons wear the accent* already called the loudest repeated element on
-     the record.
-  3. **The gutter goes to 80px**, buying **88px of plot — about 13% on an iPad**, against the 68px
-     the 100px option was worth.
-
-  **The wrinkle that has to be solved with it, and it is the reason this is a session and not an
-  hour:** the medication band's gutter holds each row's drug name („Ringer-Acetat“ and friends),
-  and those do not fit in 80px. Either the drug name moves into the plot beside its own bar, where
-  the dose already sits and where `timeline__halo` now makes text legible over the grid, or the
-  band keeps a wider gutter than the lanes — which breaks the single left edge that makes the lanes
-  and the bands one timeline, and is therefore not an option. **Plan on moving the drug name.**
-
-  **What has to be proven, by scripted gesture and not by reading:**
-  - A press on the gutter block opens that row's entry sheet; a press on the plot still switches
-    how the lane reads; a press on a point still selects it; a hold-and-drag still corrects it.
-    `gutter.spec.ts` already holds four of these and is the place to extend.
-  - A **drag** that starts in the gutter scrolls the record and opens nothing. This is the new risk
-    the painted button never had, because the target is now the size of the whole gutter block.
-  - Every lane is at least 74px tall, so a 44px target still fits; assert it rather than assume it.
-
-  **Rejected on the measurements, so they are not re-proposed:** a round „+“ beside a full name
-  (`119 + 8 + 32 = 159`, saves nothing); moving axis numbers into the plot (they would sit over
-  data and are already the smallest type on the canvas); a hover-only affordance (there is no hover
-  on the first form factor).
+- **The left gutter is settled.** It is 88px, and the row's name is the control that opens its
+  entry sheet — see *The row's name is the button, and the gutter is 88px* above, which carries the
+  measurements this entry used to argue over and the two things that turned out to be wrong in
+  them.
 
 - **NiBP on the timeline** is now settled in both halves: entry is one reading, three stored
   entries sharing the timestamp the user set; the chart draws them as paired chevrons on one stem

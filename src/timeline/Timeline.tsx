@@ -16,12 +16,12 @@
  * medication or a milestone is a drug, a dose, a unit and a time, none of which a drag can
  * express, so the bands hand their entries to the entry sheet instead.
  *
- * Creating is per row. Every lane and both bands carry their own „Erfassen“ button, so what is
- * being written down is chosen by pointing at the row it belongs to rather than by naming it in a
- * list — which is why the entry sheet no longer opens on a chooser. A lane's button sits in its
- * gutter, under the name and the unit: that space is already the lane's and is otherwise empty, and
- * six buttons stacked between the lanes would add half a screen of height to a chart that fills an
- * iPad. The bands' gutters hold their rows' own labels, so their buttons sit beneath them instead.
+ * Creating is per row, and the row's own name is what starts it. Every lane and both bands carry a
+ * `GutterBlock` — the name, the unit and a „+“ — and pressing it opens that row's entry sheet, so
+ * what is being written down is chosen by pointing at the row it belongs to rather than by naming
+ * it in a list. There is no separate button: a painted box beside the name was the loudest
+ * repeated element on the record and the widest thing in the gutter, and the name was already in
+ * the place a finger goes.
  *
  * The chart also reads two ways. Its normal state is a trace: points joined into a line, which is
  * what makes a trend visible and is the reason to draw vitals at all. But a protocol is also read
@@ -65,10 +65,26 @@ import {
 } from './scales'
 
 /**
- * Width of the left gutter holding lane labels and axis values. Sized so the longest German lane
- * name ("Sauerstoffsättigung") clears the axis numbers rather than printing over them.
+ * Width of the left gutter: the row's name, its unit, and its axis numbers.
+ *
+ * 88, and every part of that is measured. Names and numbers share the gutter's one line of
+ * reading — the name at the left, the axis number right-aligned to `GUTTER - 8` — so the width is
+ * the widest of the two put together. „+ Medikament“ is the widest name at 80.5px and „38,0“ the
+ * widest number at 26.4px, but they are never in the same row: the pairs that are, are „+ Temp“
+ * (41.9) against „38,0“ and „mmHg“ (35.8) against „220“ (19.8), which clear each other by 11.7px
+ * and 24.4px at this width.
+ *
+ * It is 88 rather than 168 because the names are abbreviated. `LANES` carries a `short` for each,
+ * and at full length nothing fits: „Sauerstoffsättigung“ alone is 119.1px, which with a number
+ * beside it is the 168 this used to be. Abbreviating is what buys the 80px of chart — about 12%
+ * more of it on an iPad — not the number written here.
+ *
+ * The 2026-08-21 proposal in `docs/decisions.md` said 80 and is superseded by 8px: it costed the
+ * names without the „+“ that now precedes each of them, which is 8.6px, and did not price the
+ * medication band's own name at all. „Medikament“ is not abbreviated further, because „Med.“ is
+ * shorthand for a word the row has room to say.
  */
-const GUTTER = 168
+const GUTTER = 88
 const RIGHT_PAD = 24
 /**
  * The right-hand rail holding each lane's current-value readout.
@@ -94,10 +110,15 @@ const LANE_INSET = 12
 const LANE_BASE_HEIGHT = 92
 const AXIS_HEIGHT = 30
 const MED_ROW_HEIGHT = 34
-/** Breathing room at the top and bottom of a band, now that its heading is a row of HTML above. */
+/** Breathing room at the top and bottom of a band, now that its name is HTML in the gutter. */
 const BAND_PAD = 6
-/** An empty band is a ruled strip: enough to read as a section with nothing in it yet. */
-const BAND_EMPTY_HEIGHT = 24
+/**
+ * An empty band is a ruled strip: enough to read as a section with nothing in it yet — and, since
+ * the band's name sits in the gutter beside it, never shorter than that name's 44px block. A band
+ * with one drug in it is 46px and clears this by 2; below that the block would hang past the foot
+ * of the record, which is where it used to be and what put „+ Medikament“ over the lane below.
+ */
+const BAND_MIN_HEIGHT = 48
 /**
  * The medication band's two marks, from the paper protocol: a bolus is a vertical tick at its
  * time, an infusion a thin rule spanning the period it ran, serifed at each end.
@@ -262,20 +283,19 @@ export function Timeline({ record, onCorrect, onRemove, onEdit, onAdd }: Timelin
               and the drugs are what happened inside it. */}
           <div className="timeline__row">
             <EventBand width={width} window={window} events={events} onEdit={onEdit} />
-            {/* The lane pattern, not the band pattern. A band normally has to carry its heading
-                and button in a row above it because its gutter holds each row's drug name — the
-                event band's gutter holds nothing, so its button goes where a lane's goes: pinned
-                in the gutter, level with the heading, costing the record no height at all. */}
-            <AddButton
-              className="timeline__add timeline__add--gutter"
-              label="Ereignis"
-              name="Ereignis erfassen"
+            {/* The band's name, in the gutter, where the lanes keep theirs — and it is the
+                control, the same as theirs. The band used to draw „Ereignisse“ inside its own
+                `<svg>` with a painted button beside it; a heading and a button that say the same
+                word are one thing drawn twice. */}
+            <GutterBlock
+              name="Ereignis"
+              label="Ereignis erfassen"
               onClick={() => onAdd({ kind: 'event' })}
             />
           </div>
           {LANES.map((lane) => (
-            // The wrapper is what the lane's own button is positioned against, which is why it is
-            // here rather than inside `VitalLane`: an SVG cannot hold a real button, and the button
+            // The wrapper is what the lane's own block is positioned against, which is why it is
+            // here rather than inside `VitalLane`: an SVG cannot hold a real button, and the name
             // has to be a real one to be reachable by keyboard and named to a screen reader.
             <div key={lane.id} className="timeline__row">
               <VitalLane
@@ -292,37 +312,33 @@ export function Timeline({ record, onCorrect, onRemove, onEdit, onAdd }: Timelin
                 onRemove={onRemove}
                 onEdit={onEdit}
               />
-              <AddButton
-                className="timeline__add timeline__add--gutter"
-                label="Erfassen"
-                name={`${lane.label} erfassen`}
+              <GutterBlock
+                name={lane.short}
+                unit={laneUnit(lane)}
+                // Both readings of the name in one string: the abbreviation is what is written
+                // there, so speech input and a spoken label agree, and the full name is what a
+                // screen reader is actually owed — „SpO₂“ alone is a spelling, not a parameter.
+                label={`${lane.short}, ${lane.label} erfassen`}
                 onClick={() => onAdd(targetForLane(lane))}
               />
             </div>
           ))}
 
-          {/* Heading and button on one row, above the band rather than under it. A band grows
-              downwards as it fills, so a button in the flow beneath it moved further from its own
-              heading with every drug added — on a long case it ends up off the screen entirely.
-              The lanes never had this problem: theirs is pinned to the top of the gutter. This is
-              the same position, in the only place a band has room for it. */}
-          {/* The medication band cannot use the gutter beside it — that gutter holds each row's
-              drug name. The gutter beside its *ruler* is empty, though, because the repeats drop
-              the „Uhrzeit“ label. So the heading and the button go there: the same column as the
-              other five, costing the record no row of its own, and above the band rather than
-              below it, where filling the band cannot push them away. */}
+          {/* The band's gutter is empty now, so its name goes there like every other row's. It
+              used to hold each row's drug name, and 88px does not hold „Ringer-Acetat“ — the drug
+              moved out to its own mark, where its time already is. The block is positioned
+              against the row rather than laid out inside the band, because a band grows downwards
+              as it fills and anything in that flow is pushed away from what it names; on a long
+              case, off the screen. It clears the ruler this row also carries, whose first time
+              label reaches back into the gutter. */}
           <div className="timeline__row timeline__row--band">
             <TimeAxis width={width} window={window} named={false} />
             <MedicationBand width={width} window={window} record={record} onEdit={onEdit} />
-            <div className="timeline__gutter-head">
-              <h3 className="timeline__section-name">Medikamente</h3>
-              <AddButton
-                className="timeline__add timeline__add--gutter"
-                label="Medikament"
-                name="Medikament erfassen"
-                onClick={() => onAdd({ kind: 'medication' })}
-              />
-            </div>
+            <GutterBlock
+              name="Medikament"
+              label="Medikament erfassen"
+              onClick={() => onAdd({ kind: 'medication' })}
+            />
           </div>
 
 
@@ -354,7 +370,7 @@ function EmptyRecord() {
       <div className="timeline__empty-card">
         <p className="timeline__empty-title">Noch keine Einträge</p>
         <p className="timeline__empty-hint">
-          Über „Erfassen“ an der jeweiligen Zeile aufnehmen.
+          Über das „+“ links an der jeweiligen Zeile aufnehmen.
         </p>
       </div>
     </div>
@@ -362,32 +378,49 @@ function EmptyRecord() {
 }
 
 /**
- * A row's own way of starting an entry.
+ * A row's name in its gutter, which is also the way an entry is started on that row.
  *
- * The visible word is the same on all six, because the row above it already says which one this is
- * and repeating the lane's name under the lane's name is ink for nothing. The accessible name is
- * not the same on any two: it carries the row, so the buttons are told apart in a list of controls
- * where the chart above them is not there to be seen. The visible text is contained in it, which is
- * what keeps the two readings of the button the same button.
+ * One thing, not two. Every row used to carry its name and, under it, a painted „Erfassen“ box
+ * 128px wide: six identical boxes down the left edge, the loudest repeated element on a record
+ * whose ink is supposed to be the data, and the reason the gutter could not be narrower than the
+ * widest of them. The name was already where the finger goes, and the gutter around it was
+ * already proven inert — a press on it did nothing at all. So the inert space *is* the button,
+ * and what is left of the box is a „+“ in the accent.
  *
- * The „+“ is decoration and marked as such — it repeats what "Erfassen" already says, and spoken
- * aloud in front of every one of these it is noise.
+ * The „+“ is decoration and marked as such: the accessible name already ends in „erfassen“, and
+ * spoken in front of six of these it is noise.
+ *
+ * `style` carries the width rather than the stylesheet, because that width is `GUTTER` — the same
+ * number the plot's left edge is drawn from, and a second copy of it in CSS is a copy that can
+ * disagree with the chart.
  */
-function AddButton({
-  className,
-  label,
+function GutterBlock({
   name,
+  unit,
+  label,
   onClick,
 }: {
-  className: string
-  label: string
   name: string
+  /** Lanes only: the bands measure nothing, so their block is a single line. */
+  unit?: string
+  label: string
   onClick: () => void
 }) {
   return (
-    <Button size="small" className={className} aria-label={name} onClick={onClick}>
-      <span aria-hidden="true">+ </span>
-      {label}
+    <Button
+      type="text"
+      className="timeline__gutter-block"
+      style={{ width: GUTTER }}
+      aria-label={label}
+      onClick={onClick}
+    >
+      <span className="timeline__gutter-name">
+        <span className="timeline__gutter-plus" aria-hidden="true">
+          +
+        </span>
+        {name}
+      </span>
+      {unit !== undefined && <span className="timeline__gutter-unit">{unit}</span>}
     </Button>
   )
 }
@@ -862,9 +895,9 @@ function VitalLane({
     const at = localPoint(event)
     if (hitTest(at)) return
     // Only the chart switches how the lane reads. The gutter and the value rail are the lane's
-    // furniture — a press on the parameter's name, on its entry button or on its current value is
-    // not a press on empty chart, and dropping every line on the lane in answer to one reads as
-    // the app having done something at random.
+    // furniture — a press on the parameter's name, which is also the block that opens its entry
+    // sheet, or on its current value is not a press on empty chart, and dropping every line on the
+    // lane in answer to one reads as the app having done something at random.
     if (at.x < area.left || at.x > area.right) return
 
     onToggleValues()
@@ -983,12 +1016,9 @@ function VitalLane({
         />
       ))}
 
-      <text x={0} y={20} fill={chart.ink} fontSize={12} fontWeight={600}>
-        {lane.label}
-      </text>
-      <text x={0} y={35} fill={chart.inkMuted} fontSize={11}>
-        {laneUnit(lane)}
-      </text>
+      {/* The lane's name and unit are not drawn here. They are the `GutterBlock` in the row
+          around this `<svg>`, because they are also the control that opens this lane's entry
+          sheet — and an SVG cannot hold a real button. */}
 
       {rules
         .filter((rule) => rule.labelled)
@@ -1696,11 +1726,11 @@ function MedicationBand({
   onEdit: (id: string) => void
 }) {
   const rows = medications(record)
-  // The heading is HTML now, in the row above, so the band is only its rows. An empty band keeps a
-  // ruled strip rather than collapsing: on a record with nothing in it the six headings are the
-  // six things this protocol can hold, and a heading over nothing at all reads as a rendering
-  // fault rather than as an empty section.
-  const height = rows.length === 0 ? BAND_EMPTY_HEIGHT : rows.length * MED_ROW_HEIGHT + BAND_PAD * 2
+  // The name is HTML, in the gutter beside the band, so the band itself is only its rows. An
+  // empty band keeps a ruled strip rather than collapsing: on a record with nothing in it the six
+  // names are the six things this protocol can hold, and a name over nothing at all reads as a
+  // rendering fault rather than as an empty section.
+  const height = Math.max(rows.length * MED_ROW_HEIGHT + BAND_PAD * 2, BAND_MIN_HEIGHT)
   const scale = createLaneScales(
     { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
     window,
@@ -1719,8 +1749,10 @@ function MedicationBand({
 
       {rows.map((entry, index) => {
         const y = BAND_PAD + index * MED_ROW_HEIGHT + MED_ROW_HEIGHT / 2
-        // The drug goes in the gutter, where every row aligns; the dose rides beside its own
-        // mark. Putting both in the gutter is what clipped the longer names.
+        // Drug and dose ride together beside the mark. The drug used to sit in the gutter, right
+        // aligned with every other row's — a tidier column, and one that needs 168px, because
+        // „Ringer-Acetat“ is not an abbreviation anybody would recognise shortened. The gutter is
+        // 88px now, so the name comes out to where its own time already is.
         const dose =
           entry.type === 'bolus'
             ? `${formatNumber(entry.dose)} ${entry.unit}`
@@ -1731,8 +1763,14 @@ function MedicationBand({
           entry.type === 'bolus'
             ? start
             : Math.max(scale.map(entry.endedAt ?? window.to), start + 4)
-        // Flip the dose to the left of the mark when it would run off the right edge.
-        const flip = end + 90 > plotRight(width)
+        // Flip the label to the left of the mark when it would run off the right edge — which a
+        // running infusion always does, since its rule is drawn to the edge of the window.
+        //
+        // An estimate, and knowingly one: the drug is set in the UI face, where `labelWidth`'s
+        // arithmetic holds only for the mono labels. Being a few pixels out moves a comfortable
+        // margin, not a label off the canvas.
+        const label = `${entry.drug} ${dose}`
+        const flip = end + 10 + label.length * 6.6 > plotRight(width)
 
         const summary =
           entry.type === 'bolus'
@@ -1743,16 +1781,6 @@ function MedicationBand({
 
         return (
           <Fragment key={entry.id}>
-            <text
-              x={GUTTER - 8}
-              y={y + 4}
-              fill={chart.inkMuted}
-              fontSize={12}
-              textAnchor="end"
-            >
-              {entry.drug}
-            </text>
-
             {entry.type === 'bolus' ? (
               <line
                 x1={start}
@@ -1797,15 +1825,21 @@ function MedicationBand({
               </>
             )}
 
+            {/* One label, two readings of the same row: what was given, then how much. The
+                halo is what makes it legible where it has to sit over the rule of an infusion
+                that is still running. */}
             <text
-              className="timeline__num timeline__halo"
+              className="timeline__halo"
               x={flip ? start - 10 : end + 10}
               y={y + 4}
               fill={chart.ink}
-              fontSize={11}
+              fontSize={12}
               textAnchor={flip ? 'end' : 'start'}
             >
-              {dose}
+              {entry.drug}
+              <tspan className="timeline__num" fill={chart.inkMuted} fontSize={11} dx={6}>
+                {dose}
+              </tspan>
             </text>
 
             {/* Last, so it sits above the row's own ink: an SVG element painted later is the one
@@ -1844,11 +1878,10 @@ function EventBand({
   onEdit: (id: string) => void
 }) {
   // Kept when empty for the reason the medication band is: an empty section still says the record
-  // can hold one, and here it is also what the button in the gutter beside it is labelled by.
-  // One height, full or empty. The band carries its own button in the gutter beside it, pinned at
-  // the same y a lane's is, so it cannot be shorter than that button — an empty band collapsed to
-  // its heading left „+ Ereignis“ hanging over the saturation lane below, where it was still
-  // clickable and no longer inside anything.
+  // can hold one. One height, full or empty. The band's name sits in the gutter beside it, pinned
+  // at the same y a lane's is, so the band cannot be shorter than that block — an empty band
+  // collapsed to its name left „+ Ereignis“ hanging over the saturation lane below, where it was
+  // still clickable and no longer inside anything.
   const height = 24 + EVENT_ROW_HEIGHT * 2
   const scale = createLaneScales(
     { left: GUTTER, right: plotRight(width), top: 0, bottom: 0 },
@@ -1865,10 +1898,6 @@ function EventBand({
       aria-label="Ereignisse"
     >
       <TimeGrid scale={scale} window={window} top={24} bottom={height} />
-
-      <text x={0} y={18} fill={chart.ink} fontSize={13} fontWeight={600}>
-        Ereignisse
-      </text>
 
       {events.map((event, index) => {
         const x = scale.map(event.at)

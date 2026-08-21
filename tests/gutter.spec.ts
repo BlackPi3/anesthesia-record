@@ -1,31 +1,25 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * The lane's „Erfassen“ button is painted 32px tall and answers to 44px.
+ * The gutter block: a row's name, its unit, and the „+“ that starts an entry on it — one control,
+ * 88px wide and 44px tall, where there used to be a name with a painted 128x32 button under it.
  *
- * `theme.ts` argues that 44px is the size a fingertip reliably hits; `index.css` then paints these
- * six controls at 32px, because a 44px box does not fit the shortest lane — measured, it hangs
- * 10.5px past the temperature lane's floor. The resolution is that the box stays and the target
- * grows into the gutter above and below it, which is dead space: a press on a lane's name, on its
- * unit, or on empty gutter does nothing at all.
+ * The claim is not that a button works. It is that the gutter answers and the chart beside it
+ * still does what it did: `CLAUDE.md` requires anything new on the lane surface to say what the
+ * other gestures must not do, and to prove it by a scripted gesture rather than by reading the
+ * handler. So the first two presses land where nothing used to happen, and the last three are the
+ * guards — asked, rather than assumed, what would still pass with the change taken out. The
+ * guards would; the first two would not.
  *
- * That is exactly the kind of claim that cannot be checked by reading the handler, and `CLAUDE.md`
- * requires anything new on this surface to say what the other gestures must not do. So these are
- * scripted presses. What would still pass with the expansion taken out, checked rather than
- * assumed: the last two, which are the guards. The first two fail, and they are the feature.
- *
- * The fourth gesture, hold-and-drag to correct a point, is not repeated here. It needs real touch
- * input through the Chrome DevTools Protocol and `touch.spec.ts` already drives it; nothing in
- * this change is near it, and a second copy of that machinery would be the thing most likely to
- * rot.
+ * Two things are covered elsewhere on purpose. A hold-and-drag on a point is `touch.spec.ts`,
+ * which drives real touch through the Chrome DevTools Protocol; so is the drag that starts on
+ * this block, which is the new risk here — the target is now the size of the whole gutter, and a
+ * finger that swipes from it has to scroll the record and open nothing. A second copy of that
+ * machinery in this file would be the thing most likely to rot.
  */
 
-/** The button is 32px in a 44px target, so 6px above its painted top is inside one and not the
-    other. 4px of margin either side of that edge, which is more than any rounding. */
-const ABOVE_THE_BOX = 6
-
 const laneOf = (page: Page, name: RegExp) => page.getByRole('group', { name })
-const addButton = (page: Page, name: string) => page.getByRole('button', { name })
+const blockOf = (page: Page, name: string) => page.getByRole('button', { name })
 
 async function boxOf(page: Page, target: ReturnType<typeof laneOf>) {
   const box = await target.boundingBox()
@@ -44,39 +38,42 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/')
 })
 
-test('a press just above the painted button still opens that lane\'s entry sheet', async ({
+test("a press on the lane's axis number opens that lane's entry sheet", async ({
   page,
   hasTouch,
 }) => {
-  const button = await boxOf(page, addButton(page, 'Temperatur erfassen'))
+  const block = await boxOf(page, blockOf(page, 'Temperatur erfassen'))
 
-  // Above the painted box, inside the target. Before the hit area was expanded this press landed
-  // on the lane's unit, which does nothing.
-  await press(page, hasTouch, button.x + button.width / 2, button.y - ABOVE_THE_BOX)
+  // The far right of the block, on the line the ceiling number „38,0“ is written on: the gutter is
+  // the lane's furniture, and all of it is the control now. Before this change the same press
+  // landed on an SVG number, which does nothing.
+  await press(page, hasTouch, block.x + block.width - 6, block.y + 8)
 
   const sheet = page.getByRole('dialog')
   await expect(sheet).toBeVisible()
   await expect(sheet.getByText('Temperatur', { exact: false }).first()).toBeVisible()
 })
 
-test('the target is 44px and ends inside its own lane', async ({ page }) => {
+test('the target is 44px, the full width of the gutter, and inside its own lane', async ({
+  page,
+}) => {
   const lane = await boxOf(page, laneOf(page, /Temperatur, Achse/))
-  const button = await boxOf(page, addButton(page, 'Temperatur erfassen'))
+  const block = await boxOf(page, blockOf(page, 'Temperatur erfassen'))
 
-  // Temperatur is the shortest lane — 74px, against a button 32px tall at y=40 — so it is the one
-  // the asymmetric inset is cut to, and the only one where the two claims can both be tight.
+  // Temperatur is the shortest lane at 74px, so it is the one where a 44px target and „inside the
+  // lane“ can both be tight. The old painted button could not be 44px for exactly this reason: a
+  // 44px box hung 10.5px past this lane's floor, so it stayed 32px and grew an invisible hit area.
   const edges = await page.evaluate(
     ([x, from, to]) => {
-      // Identity, not `closest('.timeline__add')`. Any-button was enough while this lane's
-      // neighbours were charts; the row below now carries the medication band's own button, and a
-      // search that accepts any of them walks straight out of the lane and reports a target half
-      // as tall again as it is.
-      const target = document.querySelector('[aria-label="Temperatur erfassen"]')
+      // Identity, not `closest('.timeline__gutter-block')`: the row below carries the medication
+      // band's own block, and a search that accepts any of them walks out of the lane and reports
+      // a target half as tall again as it is. Matched on the end of the accessible name, which
+      // begins with the abbreviation — „Temp, Temperatur erfassen“.
+      const target = document.querySelector('[aria-label$="Temperatur erfassen"]')
       const answers = (y: number) => document.elementFromPoint(x, y)?.closest('button') === target
-      // The painted box answers, so each search starts inside it and walks out to where it stops.
-      // It returns the last point that still answered, not the midpoint of the final interval:
-      // the furthest point that is provably inside the target, so a comparison against the lane's
-      // own edge cannot fail by a rounding artifact of the search.
+      // Each search starts inside the block and walks out to where it stops answering. It returns
+      // the last point that still answered, so a comparison against the lane's own edge cannot
+      // fail by a rounding artifact of the search.
       const edge = (inside: number, outside: number) => {
         for (let step = 0; step < 30; step += 1) {
           const mid = (inside + outside) / 2
@@ -85,20 +82,38 @@ test('the target is 44px and ends inside its own lane', async ({ page }) => {
         }
         return inside
       }
-      return { top: edge(from, from - 20), bottom: edge(to, to + 20) }
+      // 30px of search either side of the centre, which is more than the 22 a 44px target needs:
+      // an interval that starts inside the block at both ends reports the block's own height as
+      // whatever it was given, and 20 of it read a 44px target as 40.
+      return { top: edge(from, from - 30), bottom: edge(to, to + 30) }
     },
-    [button.x + button.width / 2, button.y, button.y + button.height] as const,
+    [block.x + block.width / 2, block.y + block.height / 2, block.y + block.height / 2] as const,
   )
 
-  // The point of the change: what a fingertip has to hit is 44px, not the 32px that is painted.
-  // Subpixel layout puts it at 43.98, so this is 44 to within a pixel rather than to the decimal.
-  expect(edges.bottom - edges.top).toBeGreaterThan(43.5)
-  expect(edges.bottom - edges.top).toBeLessThan(44.5)
+  // 44 is the claim; the pixel of slack above it is the browser hit-testing a box whose top is at
+  // 649.9 as though it began at 649. Bounded on both sides all the same, because a target that
+  // measured 60 would mean the block had swallowed something that is not its own.
+  expect(edges.bottom - edges.top).toBeGreaterThanOrEqual(44)
+  expect(edges.bottom - edges.top).toBeLessThan(46)
+  // The whole gutter, which is `GUTTER` in `Timeline.tsx` and the plot's left edge.
+  expect(block.width).toBe(88)
 
   // And it is bought entirely from this lane's own gutter. A target that ran past the lane's floor
   // would be taking presses that belong to the Medikamente band below it.
   expect(edges.bottom).toBeLessThanOrEqual(lane.y + lane.height)
   expect(edges.top).toBeGreaterThanOrEqual(lane.y)
+})
+
+test('the gutter below the block is still inert', async ({ page, hasTouch }) => {
+  const lane = await boxOf(page, laneOf(page, /Sauerstoffsättigung, Achse/))
+
+  // The tallest lane, so there is a good deal of gutter under its block. Nothing may happen here:
+  // the sheet must not open, and this is not the chart, so it must not switch how the lane reads
+  // either.
+  await press(page, hasTouch, lane.x + 20, lane.y + lane.height - 8)
+
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('[data-value-label]')).toHaveCount(0)
 })
 
 test('a press on the plot still switches how the lane reads, and opens nothing', async ({
@@ -125,13 +140,45 @@ test('a press on a point still selects it, and opens nothing', async ({ page, ha
 })
 
 /**
- * The two bands' buttons do not move when their band fills.
+ * The abbreviation is what is written; the full name is what is spoken.
  *
- * They used to. The heading was drawn inside the band's own `<svg>` and the button sat in the flow
+ * „SpO₂“ is what fits an 88px gutter, and it is a name a Narkoseprotokoll already uses — but it is
+ * also a spelling, and a screen reader owes its user the parameter. So the accessible name carries
+ * both. That the visible text is contained in the spoken one is not decoration: it is what lets
+ * someone driving the interface by voice say what they can see, and it is the property that breaks
+ * silently the moment either half is edited on its own.
+ */
+test('every block is spoken with its full name and written with its short one', async ({ page }) => {
+  const blocks = await page.locator('.timeline__gutter-block').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      written: node.querySelector('.timeline__gutter-name')!.textContent!.replace('+', '').trim(),
+      spoken: node.getAttribute('aria-label')!,
+    })),
+  )
+
+  expect(blocks.map((block) => block.written)).toEqual([
+    'Ereignis',
+    'SpO₂',
+    'HF',
+    'RR',
+    'Temp',
+    'Medikament',
+  ])
+  for (const { written, spoken } of blocks) {
+    expect(spoken, `„${written}“ is not in its own accessible name`).toContain(written)
+    expect(spoken).toMatch(/ erfassen$/)
+  }
+  expect(blocks[1].spoken).toContain('Sauerstoffsättigung')
+})
+
+/**
+ * The medication band's block does not move when the band fills.
+ *
+ * It used to. The name was drawn inside the band's own `<svg>` and the button sat in the flow
  * beneath it, so every drug added pushed „+ Medikament“ further from the „Medikamente“ it belongs
  * to. This is the invariant that replaced it, and it is worth a test rather than a screenshot
  * because it is a property of the record with data in it, not of the record as it first renders:
- * the button that adds the sixth drug has to be where the button that added the first one was.
+ * the block that adds the sixth drug has to be where the block that added the first one was.
  *
  * Measured in page coordinates, not `boundingBox()`. A viewport-relative y answers a different
  * question — it moves when the page scrolls, and opening and closing the sheet is exactly the kind
@@ -145,25 +192,16 @@ async function pagePosition(page: Page, selector: string) {
   }, selector)
 }
 
-const MED_HEADING = '.timeline__gutter-head .timeline__section-name'
-const MED_BUTTON = '.timeline__gutter-head .timeline__add'
+const BAND = '[aria-label="Medikamente und Infusionen"]'
+const MED_BLOCK = '[aria-label="Medikament erfassen"]'
 
-test('the button that adds a medication stays with its heading as the band fills', async ({
-  page,
-}) => {
-  const offsetFromHeading = async () => {
-    const heading = await pagePosition(page, MED_HEADING)
-    const button = await pagePosition(page, MED_BUTTON)
-    return { gap: button.top - heading.top, left: button.left }
-  }
-
-  // The heading's own height settles when the webfont arrives — 17.06px in the fallback face,
-  // 18px in Plex — so a measurement taken before that races the font and reads a gap a pixel
-  // short of the one the record actually has.
+test('the block that adds a medication stays put as the band fills', async ({ page }) => {
+  // The block's own height settles when the webfont arrives, so a measurement taken before that
+  // races the font and reads a position a pixel off the one the record actually has.
   await page.evaluate(() => document.fonts.ready)
 
-  const before = await offsetFromHeading()
-  const bandBefore = await pagePosition(page, '[aria-label="Medikamente und Infusionen"]')
+  const before = await pagePosition(page, MED_BLOCK)
+  const bandBefore = await pagePosition(page, BAND)
 
   await page.getByRole('button', { name: 'Medikament erfassen' }).click()
   const sheet = page.getByRole('dialog')
@@ -174,23 +212,15 @@ test('the button that adds a medication stays with its heading as the band fills
   // Scoped to the band. Unscoped this matches the sheet as well, which is still in the DOM while
   // it animates closed, and a strict locator with two matches fails on timing rather than on
   // anything this test is about.
-  await expect(
-    page.locator('[aria-label="Medikamente und Infusionen"]').getByText('Fentanyl'),
-  ).toBeVisible()
+  await expect(page.locator(BAND).getByText('Fentanyl')).toBeVisible()
 
   // The band really is one row taller — without this the rest asserts nothing.
-  const bandAfter = await pagePosition(page, '[aria-label="Medikamente und Infusionen"]')
+  const bandAfter = await pagePosition(page, BAND)
   expect(bandAfter.height).toBeGreaterThan(bandBefore.height)
 
-  // And the button has not moved relative to the heading it belongs to. Measured against the
-  // heading rather than against the page, because the page above is allowed to move: the header
-  // gains „Gespeichert 09:xx“ on the first save and grows by about a pixel, which is a real change
-  // and not this one. What must not move is the button away from its own name.
-  const after = await offsetFromHeading()
-  expect(after.gap).toBe(before.gap)
+  // And the block has not moved. It is positioned against the row rather than laid out inside the
+  // band, so what grows is underneath it.
+  const after = await pagePosition(page, MED_BLOCK)
+  expect(after.top).toBe(before.top)
   expect(after.left).toBe(before.left)
-
-  // The band is underneath it, so filling the band cannot reach it — which is the whole fix.
-  const button = await pagePosition(page, MED_BUTTON)
-  expect(button.top).toBeLessThan(bandAfter.top)
 })

@@ -773,39 +773,45 @@ body {
 }
 
 /*
- * Six of these run down the left edge, one per row, and they are the only repeated interactive
- * chrome on the record. Left at AntD's default — a near-white fill inside a grey border — they
- * were the loudest thing on the page: a column of boxes outlined at very nearly `--grid-minor`,
- * which is to say drawn at the weight of the chart's own hairlines, and heavier than the lane
- * names directly above them. A lane's name is what identifies the row, and it was losing to its
- * own button.
+ * A row's name in its gutter, and the record's primary action, drawn as one thing.
  *
- * The box is dropped and `--accent` does the work instead. The accent is already declared as the
- * one colour the interface uses to say „you can press this“, and this is the record's primary
- * action, so it is the control that should be wearing it. A wash of the same accent stands in for
- * the border: enough to read as a key at a glance, far too light to compete with a trace.
+ * Six of these run down the left edge — four lanes and two bands — and until now each was a name
+ * with a painted 128x32 „Erfassen“ box beneath it. That column of boxes was the loudest repeated
+ * element on a page whose ink is meant to be the data, and it was also what held the gutter at
+ * 168px: the box was the widest thing in it. Both problems have the same answer. The gutter around
+ * the name was already inert, so the name is the button, and all that is left of the box is a „+“
+ * in the accent — the one colour this interface uses to say „you can press this“.
  *
- * The wash is there at rest and not only under a pointer, because the iPad is the first form
- * factor and there is no hover on it. A control whose only affordance is a hover state is not an
- * affordance on a touch screen.
+ * No painted surface at rest, on purpose. The affordance is the „+“, which is legible on a touch
+ * screen where a hover state is not; the hover below is for the mouse and adds nothing the iPad
+ * depends on.
  *
- * One width for all six and the label left-aligned, so the „+“ glyphs line up down the edge and
- * the words line up behind them — a column instead of three ragged widths. 128px is the gutter
- * clearance figure from the rule below, and the longest label („+ Medikament“) sits inside it.
+ * `width` is set in `Timeline.tsx` from `GUTTER`, because that is the same number the plot's left
+ * edge is drawn from and two copies of it can disagree.
  */
-.timeline__add.ant-btn {
-  width: 128px;
-  height: 32px;
+.timeline__gutter-block.ant-btn {
+  position: absolute;
+  left: 0;
+  /* 4px down, which puts the name's baseline on the lane's ceiling number — the two are one line
+     of reading, the name at the left of the gutter and the number at the right of it. */
+  top: 4px;
+  /*
+   * 44px, the size `theme.ts` argues a fingertip reliably hits, and the whole width of the gutter.
+   * The painted button could never be this: measured, a 44px box hung 10.5px past the shortest
+   * lane's floor, so it stayed 32px and grew an invisible hit area instead. With nothing painted
+   * there is nothing to overflow — the block is the target.
+   */
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: flex-start;
-  padding-inline: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent);
-  /* `--accent` at 7%. Written as a literal rather than a `color-mix`, because it is the same
-     colour and this way it is one value with no runtime blending behind it. */
-  background: rgba(47, 75, 124, 0.07);
+  gap: 1px;
+  padding: 0;
+  background: transparent;
   border-color: transparent;
   box-shadow: none;
+  text-align: left;
 }
 
 /*
@@ -813,131 +819,60 @@ body {
  * stylesheet is parsed, so a selector of equal specificity loses to it. The extra pseudo-class is
  * what makes these win, the same fight `src/entry/sheet.ts` documents.
  */
-.timeline__add.ant-btn:not(:disabled):hover {
-  color: var(--accent);
-  background: rgba(47, 75, 124, 0.13);
-  border-color: transparent;
+.timeline__gutter-block.ant-btn:not(:disabled):hover,
+.timeline__gutter-block.ant-btn:not(:disabled):active {
+  background: transparent;
 }
 
-.timeline__add.ant-btn:not(:disabled):active {
+.timeline__gutter-block.ant-btn:not(:disabled):hover .timeline__gutter-name,
+.timeline__gutter-block.ant-btn:not(:disabled):active .timeline__gutter-name {
   color: var(--accent);
-  background: rgba(47, 75, 124, 0.2);
-  border-color: transparent;
 }
 
-.timeline__add.ant-btn:focus-visible {
+.timeline__gutter-block.ant-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* The „+“ is decoration and is marked `aria-hidden` in `Timeline.tsx`; it is set at the text
-   weight rather than the label's so it reads as a mark and the word reads as the action. */
-.timeline__add.ant-btn > [aria-hidden='true'] {
+/* The row's name, at the weight and size the lanes drew it inside their own `<svg>`, so lifting it
+   into HTML is a change of element and not of design. */
+.timeline__gutter-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--ink);
+}
+
+/* Set at the text weight rather than the name's, so the mark reads as a mark and the word reads as
+   the row. It is `aria-hidden` in `Timeline.tsx`. */
+.timeline__gutter-plus {
+  margin-right: 3px;
   font-weight: 400;
+  color: var(--accent);
+}
+
+.timeline__gutter-unit {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ink-muted);
 }
 
 /*
- * Directly under the lane's name and unit, not at the foot of the lane. A lane is taller than its
- * label, so a button pinned to the bottom of one ends up nearer the next lane's name than its own
- * — which is the one thing this button cannot afford to be ambiguous about. The 40px clears the
- * unit's baseline at y=35, and 32px of button clears the shortest lane's floor at 74px.
+ * The medication band's row carries the repeated ruler as well as the band, so its block starts
+ * below the ruler: 30px of `AXIS_HEIGHT` and then the same 4px every other row uses. Level with
+ * the ruler it would print through the first time label, which is centred on the plot's left edge
+ * and reaches 18px back into the gutter.
  *
- * The 128px width is set with the other five in the rule above, and the figure comes from here:
- * it is what keeps the button clear of the axis numbers, which are right-aligned into the gutter
- * from x=160 and reach in about 30px.
- */
-.timeline__add--gutter {
-  position: absolute;
-  left: 0;
-  top: 40px;
-}
-
-/*
- * The hit area is 44px. The painted box stays 32px.
- *
- * `theme.ts` argues that 44px is the size a fingertip reliably hits and calls AntD's 32px a
- * mouse-era size, and then the rule above overrides the six most-used controls on the record back
- * to 32px. The brief's Part 2 opens by asking for large, reliable touch targets, so this was the
- * one place in the app where the theme contradicted its own argument.
- *
- * Painting a 44px button is what the contradiction asks for and it does not fit: measured at a
- * 1080x810 viewport, 40 -> 84 is 10.5px past the temperature lane's plot floor and 10px outside
- * its `<svg>`, so the shortest lane's button would hang over the Medikamente band. Moving it up
- * instead collides with the unit's baseline at y=38.
- *
- * So the box keeps its size and only the target grows, asymmetrically, into gutter the lane is not
- * using. Measured at that viewport, the target then runs from y=30.0 to y=74.0 in the lane's own
- * coordinates: 43.98px tall, ending on the temperature lane's floor rather than past it. A
- * symmetric expansion to the same height would reach into the next row.
- *
- * The insets are not the differences you would expect from those two numbers, because the button
- * carries a 1px border and an absolutely positioned pseudo-element is laid out against the padding
- * box inside it. -10px and -3px are the pair that measures right, and `gutter.spec.ts` measures it
- * rather than trusting the arithmetic. Horizontally the target stays at x 0-128, keeping the same
- * 6px of clearance from the axis numbers, which are right-aligned from x=160 and reach in to
- * x=134.
- *
- * This is safe because the gutter is not the lane surface. `CLAUDE.md` says so — the gutter and
- * the value rail are the lane's furniture — and it was checked rather than assumed: a press on the
- * lane's name, on its unit, or on empty gutter does nothing today, and only a press on the plot
- * switches how the lane reads. The expansion claims dead space and takes nothing from the four
- * gestures. `tests/gutter.spec.ts` is what holds that, because a handler cannot be read for it.
- */
-.timeline__add--gutter::after {
-  content: '';
-  position: absolute;
-  inset: -10px 0 -3px;
-}
-
-/*
- * A band's heading and button, stacked in the gutter beside it — the same place a lane keeps its
- * name and button, and the same left edge, so all six „+“ glyphs line up in one column.
- *
- * They used to be apart: the heading was drawn inside the band's own `<svg>` and the button sat in
- * the flow underneath it. A band grows downwards as it fills, so every drug added pushed
- * „+ Medikament“ further from the „Medikamente“ it belongs to — on a long case far enough to be
- * off the screen, which is the one thing the record's primary action cannot be.
- *
- * The event band did not need this: its gutter holds nothing, so its button is an ordinary
- * `--gutter` one pinned beside its heading. The medication band's gutter holds each row's drug
- * name, and this is the way around that — the gutter beside the band's *ruler* is empty, because
- * a repeated ruler drops the „Uhrzeit“ label, and 54px of heading and button fit in it above the
- * first drug row at y=75.
+ * Absolutely positioned against the row, so it is beside the band without being inside it. A band
+ * grows downwards as it fills; anything laid out in that flow is pushed away from what it names,
+ * and on a long case ends up off the screen.
  */
 .timeline__row--band {
   margin-top: 12px;
 }
 
-.timeline__gutter-head {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-/* The same size and weight the heading had inside the `<svg>`, so lifting it into HTML is a change
-   of element and not of design. `h3` because it heads a section of the record; the lanes name
-   themselves inside their own `<svg>` and are reached as labelled groups instead. */
-.timeline__section-name {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  /* Matches the baseline the `<svg>` headings sit on, so the six row names line up across the
-     two ways they are drawn. */
-  line-height: 18px;
-}
-
-/* Not absolutely positioned: this one is stacked under its heading by the flex column above, so
-   it overrides the `--gutter` placement that the lanes rely on. The 44px target it carries is
-   the same. */
-.timeline__gutter-head .timeline__add--gutter {
-  position: relative;
-  top: auto;
-  left: auto;
+.timeline__row--band .timeline__gutter-block.ant-btn {
+  top: 34px;
 }
 
 .case-header__actions {
