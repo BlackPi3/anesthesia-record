@@ -605,6 +605,89 @@ class names is an assertion about that library's DOM, and nothing in the toolcha
 Name the parts through the component's own API where it offers one, and the assertion becomes the
 component's problem instead of yours.
 
+
+## 2026-08-21 — The test harness put the bug back after the fix removed it
+
+The recovery route for an unreadable stored case needed a test that went further than the screen:
+corrupt storage, press the one button offered, check the record comes back, then reload once more
+to prove the repair reached storage and not just the render. The corruption was written as an init
+script:
+
+```ts
+await page.addInitScript(() => {
+  window.localStorage.setItem('anesthesia-record:case', '{ this is not json')
+})
+await page.reload()
+```
+
+It failed on all three projects, at the last line of the test:
+
+```
+      130 |   await page.reload()
+    > 131 |   await expect(page.getByRole('heading', { name: 'Mustermann, Erika' })).toBeVisible()
+          |                                                                          ^
+  3 failed
+    [desktop-chrome] › tests/protocol.spec.ts:106:1 › offers a way out of unreadable data…
+    [ipad]           › …
+    [ipad-safari]    › …
+```
+
+**What it looked like was a recovery that worked once and then un-worked itself.** The button
+cleared storage, the app re-seeded, the heading appeared, the storage assertion passed — and one
+reload later the error screen was back. That reads as a fix that never reached the disk: precisely
+the failure the feature exists to prevent, and precisely the failure the extra reload was added to
+catch. Every part of the evidence pointed at the app.
+
+What it actually was: `page.addInitScript` registers a script that runs **on every navigation for
+the life of the page**, not once. The closing `reload()` ran it again and wrote the corrupt string
+back before the app booted. The app was correct the whole time; the harness was restoring the bug
+after the fix removed it. Corrupting once, through the page that is already open, is all it takes:
+
+```ts
+await page.evaluate(() => {
+  window.localStorage.setItem('anesthesia-record:case', '{ this is not json')
+})
+```
+
+`tests/protocol.spec.ts:107-109` now carries the reason as a comment, so the next reach for
+`addInitScript` there has to read past it.
+
+**The part worth writing down is that this is the second instance of one class, not a fact about
+one API.** `CLAUDE.md` already records the first, from the opposite direction — a reload test that
+cleared storage on every navigation and watched the app re-seed, so it would have passed with
+persistence entirely broken. That warning is in the `beforeEach` at the top of *this same file*,
+and it did not prevent the same mistake three tests further down.
+
+So the rule is not "remember what `addInitScript` does". It is: **setup that runs per navigation is
+not setup, it is behaviour.** Any fixture that re-applies itself on reload is part of what the test
+measures, and in a test that reloads to prove something persisted it will either hide a broken
+feature or fake a broken one.
+
+Which of the two you get is not predictable, and that is why seeing one does not inoculate you
+against the other. The first instance made a broken app look green. This one made a working app
+look red. From the outside they look nothing alike — one is a silent pass, the other is a stack
+trace pointing at the feature — and neither is visible in the assertion. The common cause is one
+line of setup, in both cases written to be helpful.
+
+
+## 2026-08-21 — The rule caught it, not a test and not a symptom
+
+Smaller, and it never shipped. The recovery button was first written as
+`setOpened(discardAndReopen)`, where `discardAndReopen` called `clearCase()` and then `openCase()`.
+React treats a function passed to a setter as an updater and may invoke it twice in development, so
+that would have cleared storage twice and seeded over the first seed. The fix was to move both
+calls into the click handler and pass `setOpened` a finished value.
+
+`CLAUDE.md` states it flatly — *side effects never go in a React state updater* — and `useCase.ts`
+had already had this fight and won it, with a comment recording the outcome. Nothing caught this
+one except reading the rule: there was no symptom, and no test would have failed in production
+mode.
+
+What is actually worth remembering is not the mistake but its packaging: **a comment justifying the
+wrong version had already been written before the rule was checked.** The reasoning was fluent and
+it was wrong, and fluency is not a signal. That is a point in favour of keeping the rulebook short
+enough to re-read.
+
 ---
 
 ## Open questions to revisit
