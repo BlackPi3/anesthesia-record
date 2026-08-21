@@ -992,6 +992,32 @@ body {
 }
 
 /*
+ * A label written inside the plot knocks the grid out from behind its own glyphs.
+ *
+ * This is not a new treatment. `ValueLabel` already carries its own surface, for the reason its
+ * comment gives: a number set straight onto the chart is read across gridlines, event rules and
+ * the neighbouring lane's ink. The two bands' labels never got it — „Schnitt“ sits at 08:42 and
+ * the quarter-hour rule at 08:45 runs through the word, and a dose reads across whatever hairline
+ * happens to fall behind it. So this applies a decision the app had already made to the two places
+ * that were missed.
+ *
+ * A stroke of `--paper` under the fill rather than a rect behind the text: the event band is
+ * sparse, and five opaque plates would be the heaviest thing in it. The halo hugs the glyphs, so
+ * the rule still shows between the letters and the grid stays continuous to the eye — which the
+ * grid has to be, because both bands are ruled from the same window as the lanes and that is what
+ * makes them one timeline.
+ *
+ * 3px is the whole stroke and it is centred on the glyph outline, so 1.5px of clearance each side.
+ * Wider starts closing up the counters of „ä“ and „ü“ at 11px.
+ */
+.timeline__halo {
+  paint-order: stroke fill;
+  stroke: var(--paper);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+/*
  * A lane's current-value readout. Tabular figures are not optional on it: this is the largest
  * number on the page, it is re-read every time a value is written down, and a digit that moves
  * sideways between two readings is a misreading waiting to happen.

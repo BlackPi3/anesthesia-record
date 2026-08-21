@@ -1749,7 +1749,7 @@ function MedicationBand({
             )}
 
             <text
-              className="timeline__num"
+              className="timeline__num timeline__halo"
               x={flip ? start - 10 : end + 10}
               y={y + 4}
               fill={chart.ink}
@@ -1830,6 +1830,7 @@ function EventBand({
             <line x1={x} x2={x} y1={24} y2={y + 8} stroke={chart.gridMajor} strokeWidth={1} />
             <circle cx={x} cy={y + 8} r={4} fill={chart.inkMuted} />
             <text
+              className="timeline__halo"
               x={labelX}
               y={y + 12}
               fill={chart.inkMuted}
@@ -1839,7 +1840,7 @@ function EventBand({
               {PHASE_EVENTS[event.event].label}
             </text>
             <text
-              className="timeline__num"
+              className="timeline__num timeline__halo"
               x={labelX}
               y={y + 25}
               fill={chart.inkMuted}

@@ -1269,6 +1269,42 @@ question and the „Jetzt“ button on submission day.
 
 ---
 
+## 2026-08-21 — Labels inside the plot knock the grid out from behind their glyphs
+
+**What:** `.timeline__halo` — `paint-order: stroke fill` with a 3px `--paper` stroke — on the event
+band's names and times and on the medication band's doses. Nothing moves; the only change is that
+a hairline no longer runs through a word.
+
+**Why it is not a new decision.** `ValueLabel` has carried its own opaque surface since the reading
+mode was built, and its comment gives the reason: a number set straight onto the chart is read
+across gridlines, event rules and the neighbouring lane's ink. The two bands were simply never
+given the same treatment. „Schnitt“ is documented at 08:42 and the quarter-hour rule at 08:45 runs
+straight through the word; „0,2 µg/kg/min“ crosses two hairlines. This applies a decision the app
+had already made to the two places that were missed.
+
+**Why a halo and not a plate.** The value labels use an opaque rounded rect, and it is right there:
+they sit over data, sometimes three to a box, and they have to be opaque enough that the collision
+search in `labels.ts` means something. The bands are sparse and their labels sit over grid only, so
+five opaque plates would be the heaviest thing in a band whose whole content is five thin marks. A
+stroke hugging the glyphs also leaves the rule visible between the letters, so the grid stays
+continuous to the eye — which matters, because both bands are ruled from the same window as the
+lanes and that is what makes them one timeline rather than three stacked pictures.
+
+**Rejected: stopping the grid under the label rows.** `CLAUDE.md` is explicit that the grid runs
+under the bands, from the same window and the same plot edges, because a dose with no time under it
+is not on a shared timeline. Clearing the ruling to make room for a word is solving a paint problem
+by deleting the structure.
+
+**No test, deliberately**, on the principle `typography.spec.ts` opens with: most of that change was
+paint and paint does not need a test, and what earned tests there was the one place a font had
+become an input to geometry. Nothing measures this halo — no layout depends on it, and if
+`paint-order` ever stopped applying the labels would collide again exactly as they did before,
+which is a cosmetic regression and not a silent data defect.
+
+**Cost:** the seven story videos were re-recorded, because both bands appear in them.
+
+---
+
 ## Open decisions (not yet made)
 
 - **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say
