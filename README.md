@@ -401,6 +401,13 @@ Scope decisions, with the reason each one was made.
   the app where a control sits between two blocks of text that belong together. Landscape is the
   orientation the app is designed for and the one the recordings use, and moving the actions would
   change the header at every width to fix the narrowest one.
+- **The reading mode has a density limit, and it degrades by overlapping rather than by hiding.**
+  Asked to spell every number out, the chart searches for a position for each label and takes the
+  least bad one when nothing is free — a label may end up drawn over a gridline or slightly over a
+  neighbour, and it is never dropped, because a value missing from a clinical record is the worse
+  failure by a long way. The blood pressure lane is where the limit bites first: one reading is a
+  three-line box, and two of those closer together than about 95px near the edge of the window
+  cannot both find a clear side. The demo case stays inside that limit deliberately.
 - **Two things are still open.** The left gutter is 168px, sized so „Sauerstoffsättigung“ clears the
   axis numbers; narrowing it to 100px would buy about 68px of chart on an iPad but needs the lane
   name to go somewhere else first, and where is a design decision that has not been made. And the

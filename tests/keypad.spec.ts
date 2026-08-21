@@ -52,7 +52,7 @@ test.beforeEach(async ({ page }) => {
 test('the first digit replaces the value the sheet opened on', async ({ page }) => {
   await openEntry(page, 'Herzfrequenz')
   // The sheet opens on the last heart rate in the case, and 8 has to mean 8 rather than 758.
-  await expect(sheet(page).locator('.value-field__number')).toHaveText('75')
+  await expect(sheet(page).locator('.value-field__number')).toHaveText('74')
 
   await tap(page, '8')
   await expect(sheet(page).locator('.value-field__number')).toHaveText('8')

@@ -51,26 +51,26 @@ test.beforeEach(async ({ page }) => {
 
 test('records a new value with the steppers and saves it', async ({ page }) => {
   const before = await storedVitals(page, 'temperature')
-  expect(before).toHaveLength(5)
+  expect(before).toHaveLength(6)
 
   await openEntry(page, 'Temperatur')
 
   // The control opens on the last reading for the metric, which is what makes most entries a
   // couple of taps rather than a hunt across the range.
-  await expect(page.locator('.value-field__number')).toHaveText('36,5')
+  await expect(page.locator('.value-field__number')).toHaveText('36,4')
 
   await page.getByRole('button', { name: 'Temperatur erhöhen' }).click()
   await page.getByRole('button', { name: 'Temperatur erhöhen' }).click()
-  await expect(page.locator('.value-field__number')).toHaveText('36,7')
+  await expect(page.locator('.value-field__number')).toHaveText('36,6')
 
   await commit(page)
   await expect(page.getByText(/^Gespeichert /)).toBeVisible()
 
   const after = await storedVitals(page, 'temperature')
-  expect(after).toHaveLength(6)
+  expect(after).toHaveLength(7)
 
   const created = after[after.length - 1]
-  expect(created.value).toBeCloseTo(36.7, 5)
+  expect(created.value).toBeCloseTo(36.6, 5)
   // A new entry is not a correction: it starts with an empty audit trail.
   expect(created.revisions).toEqual([])
   expect(created.deletedAt).toBeNull()

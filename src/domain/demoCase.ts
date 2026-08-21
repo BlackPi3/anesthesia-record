@@ -42,10 +42,17 @@ function vital(kind: VitalKind, minutes: number, value: number): VitalEntry {
   }
 }
 
-const MEASUREMENT_MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
+/**
+ * Measurement runs past the end of the anaesthetic, because the case does. Ausleitungsende is at
+ * minute 48 and Entlassung at 75, so minutes 65 and 70 are the recovery observations before the
+ * patient goes home — and without them the record stops measuring fifteen minutes before it ends,
+ * which reads as an anaesthetic still in progress rather than as a case that is finished.
+ */
+const MEASUREMENT_MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
 
-const spo2 = [98, 99, 99, 100, 100, 99, 98, 99, 99, 100, 99, 98, 98]
-const heartRate = [78, 74, 71, 69, 79, 83, 81, 77, 74, 72, 71, 73, 75]
+// The last two are on room air in recovery, which is why the saturation settles a little lower.
+const spo2 = [98, 99, 99, 100, 100, 99, 98, 99, 99, 100, 99, 98, 98, 97, 97]
+const heartRate = [78, 74, 71, 69, 79, 83, 81, 77, 74, 72, 71, 73, 75, 76, 74]
 
 const spo2Entries = MEASUREMENT_MINUTES.map((minutes, i) => vital('spo2', minutes, spo2[i]))
 
@@ -73,6 +80,13 @@ const bloodPressure: Array<[minutes: number, sys: number, mean: number, dia: num
   [50, 129, 95, 78],
   [60, 133, 98, 80],
 ]
+// No cuff reading in recovery, and that is a choice about this case rather than about the clock:
+// NiBP is intermittent, a last reading at 09:30 before a 09:45 discharge is ordinary, and the
+// alternative collides. A pressure label is three lines on one box; two of them ten minutes apart
+// this close to the right edge cannot both take a side position, so the reading-mode search falls
+// back to its least-bad placement and two boxes touch. That fallback is correct — a value drawn
+// over a gridline beats a value silently dropped — but the case that ships should not be
+// demonstrating it. The limit is written down in the README.
 
 const bloodPressureEntries = bloodPressure.flatMap(([minutes, sys, mean, dia]) => [
   vital('bloodPressureSystolic', minutes, sys),
@@ -86,6 +100,7 @@ const temperatureEntries = [
   vital('temperature', 30, 36.2),
   vital('temperature', 45, 36.3),
   vital('temperature', 60, 36.5),
+  vital('temperature', 70, 36.4),
 ]
 
 function phaseEvent(event: PhaseEventKind, minutes: number): PhaseEventEntry {

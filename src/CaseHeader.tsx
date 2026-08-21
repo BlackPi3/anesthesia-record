@@ -13,6 +13,8 @@
 
 import { Button, Tag, Typography } from 'antd'
 
+import { PHASE_EVENTS } from './domain/catalog'
+import { phaseEvents } from './domain/entries'
 import type { AnesthesiaCase } from './domain/types'
 import { ageAt, formatDate, formatNumber, formatTime } from './format'
 import type { SaveState } from './useCase'
@@ -59,7 +61,27 @@ export interface CaseHeaderProps {
 export function CaseHeader({ record, save, canUndo, onUndo, onReset }: CaseHeaderProps) {
   const { patient, baseline } = record
 
+  /**
+   * The last milestone documented, and when. It is a restatement of what is in the record — the
+   * newest entry in the Ereignisse band — and never an inference about the patient: nothing here
+   * decides that a case is "running" or "finished", it says which phase was written down last.
+   *
+   * It earns the first position because it is the only fact in this header that changes during a
+   * case, and because without it the record does not say where it is. Reading one at a glance,
+   * with vitals stopping at 09:40 and no phase named, is a case apparently still in theatre; the
+   * same record saying „Entlassung · 09:45“ is a case that is over. That was a real misreading,
+   * not a hypothetical one.
+   */
+  const phases = phaseEvents(record)
+  const latest = phases.at(-1)
+
   const facts: Array<[label: string, value: string]> = [
+    [
+      'Phase',
+      latest === undefined
+        ? 'noch nichts dokumentiert'
+        : `${PHASE_EVENTS[latest.event].label} · ${formatTime(latest.at)}`,
+    ],
     ['Datum', formatDate(record.date)],
     [
       'Geburtsdatum',

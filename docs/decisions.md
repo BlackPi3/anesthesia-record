@@ -1340,6 +1340,39 @@ move is the button away from its own name.
 
 ---
 
+## 2026-08-21 — The record says which phase it is in, and keeps measuring until it ends
+
+**What:** two changes with one cause. The case header's first fact is now **Phase**, carrying the
+last milestone documented and its time — „Entlassung · 09:45“ on the demo case, „noch nichts
+dokumentiert“ before the first one. And the demo case takes observations at minutes 65 and 70,
+after Ausleitungsende at 48 and before Entlassung at 75.
+
+**Why:** the record could be read for a long time and still leave the wrong impression. Vitals
+stopped at 09:30, the axis ran to 09:45, and nothing named what the last quarter hour was — which
+reads as an anaesthetic still running, not as a patient in recovery and then discharged. That was a
+real misreading by someone who had been looking at this app for days, not a hypothetical one. The
+fifteen-minute gap was demo data stopping early, and the missing sentence was the phase.
+
+**It is a restatement, never an inference.** „Phase“ prints the newest entry in the Ereignisse band
+and nothing else. Nothing decides that a case is „laufend“ or „beendet“, because that would be the
+app concluding something about a patient from the record rather than showing what is in it — the
+same line `MAD` is on.
+
+**First position because it is the only fact in that header that changes during a case.** Everything
+beside it — date, birth date, ASA, baseline — is fixed before the first entry is written.
+
+**No cuff reading in recovery, and that is a decision.** The other three parameters take readings at
+09:35 and 09:40; NiBP stops at 09:30. Intermittent measurement makes that ordinary, and the
+alternative collides: a pressure label is a three-line box, and two of them ten minutes apart that
+close to the right edge cannot both take a side position, so `placeValueLabels` falls back to its
+least-bad placement and two boxes touch. **The fallback is correct** — a value drawn over a gridline
+beats a value silently dropped, which is the rule `labels.ts` is built on — but the case that ships
+should not be demonstrating it, and `values.spec.ts` should not be relaxed to accept it. The limit
+is now in the README's known limitations, where it is a property of the reading mode rather than a
+secret about the demo data.
+
+---
+
 ## Open decisions (not yet made)
 
 - **The left gutter at 100px (Backlog §8 item 9) is not a constant edit, and the measurements say

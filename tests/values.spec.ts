@@ -60,7 +60,7 @@ test('a tap on the chart writes every value out and takes the trend lines away',
   await tapEmptyChart(page)
 
   // One label per drawn point, and the value itself is what it says.
-  await expect(labels(page)).toHaveCount(51)
+  await expect(labels(page)).toHaveCount(56)
   await expect(page.locator('[data-value-label="demo-heartRate-20"]')).toHaveText('79')
   await expect(trend).toHaveCount(0)
 
@@ -141,7 +141,7 @@ test('the button says which way the chart is being read, and switches it', async
 
   await expect(toggle(page)).toHaveText('Zahlen ausblenden')
   await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true')
-  await expect(labels(page)).toHaveCount(51)
+  await expect(labels(page)).toHaveCount(56)
 
   // The gesture and the button are one state, not two: what the tap did, the button undoes.
   await tapEmptyChart(page)

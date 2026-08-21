@@ -48,15 +48,15 @@ test.beforeEach(async ({ page }) => {
 test('every lane carries its newest value, with the unit and the time it was taken', async ({
   page,
 }) => {
-  await expect(value(page, 'spo2')).toHaveText('98')
-  await expect(value(page, 'heartRate')).toHaveText('75')
-  await expect(value(page, 'temperature')).toHaveText('36,5')
+  await expect(value(page, 'spo2')).toHaveText('97')
+  await expect(value(page, 'heartRate')).toHaveText('74')
+  await expect(value(page, 'temperature')).toHaveText('36,4')
 
   // The whole reading, as it is spoken. The unit and the time are on the readout as small type,
   // and asserting them here is what keeps the number from becoming a bare figure with no scale.
   await expect(page.getByRole('img', { name: /^Sauerstoffsättigung/ })).toHaveAttribute(
     'aria-label',
-    'Sauerstoffsättigung, zuletzt 98 %, um 09:30 Uhr.',
+    'Sauerstoffsättigung, zuletzt 97 %, um 09:40 Uhr.',
   )
 })
 
@@ -80,9 +80,9 @@ test('the pressure lane reads as one reading, and the mean is not invented', asy
 })
 
 test('correcting the newest value rewrites the readout as the point moves', async ({ page }) => {
-  await expect(value(page, 'heartRate')).toHaveText('75')
+  await expect(value(page, 'heartRate')).toHaveText('74')
 
-  const marker = await page.locator('[data-entry-id="demo-heartRate-60"]').boundingBox()
+  const marker = await page.locator('[data-entry-id="demo-heartRate-70"]').boundingBox()
   if (!marker) throw new Error('no marker for the newest heart rate')
   const from = { x: marker.x + marker.width / 2, y: marker.y + marker.height / 2 }
 
@@ -90,7 +90,7 @@ test('correcting the newest value rewrites the readout as the point moves', asyn
   await page.mouse.down()
   await page.mouse.move(from.x, from.y - 20, { steps: 8 })
   // Still held: the readout is the value being written, not the value that was saved.
-  await expect(value(page, 'heartRate')).not.toHaveText('75')
+  await expect(value(page, 'heartRate')).not.toHaveText('74')
   await page.mouse.up()
 
   const raised = await value(page, 'heartRate').textContent()
@@ -115,7 +115,7 @@ test('selecting an older point leaves the current value alone', async ({ page })
     'aria-label',
     /HF 81 \/min · 09:00/,
   )
-  await expect(value(page, 'heartRate')).toHaveText('75')
+  await expect(value(page, 'heartRate')).toHaveText('74')
 })
 
 /**
@@ -139,12 +139,12 @@ test('pressing the readout does not switch how the chart reads', async ({ page }
  * is where its real number is, and it is never clamped to the axis.
  */
 test('a value off the end of its axis is read here at its real number', async ({ page }) => {
-  await reloadWith(page, { id: 'demo-heartRate-60', set: { value: 180 } })
+  await reloadWith(page, { id: 'demo-heartRate-70', set: { value: 180 } })
 
   await expect(value(page, 'heartRate')).toHaveText('180')
   await expect(page.getByRole('img', { name: /^Herzfrequenz/ })).toHaveAttribute(
     'aria-label',
-    'Herzfrequenz, zuletzt 180 /min, um 09:30 Uhr.',
+    'Herzfrequenz, zuletzt 180 /min, um 09:40 Uhr.',
   )
 })
 
