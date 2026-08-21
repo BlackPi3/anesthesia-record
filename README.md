@@ -266,6 +266,13 @@ npm run e2e       # Playwright: builds dist and serves it, not the dev server
 npm run videos    # re-records the user-story videos in docs/videos/
 ```
 
+`npm run e2e` and `npm run videos` need the browsers themselves, which `npm install` does not
+fetch:
+
+```
+npx playwright install     # once, before the first e2e run
+```
+
 `npm run e2e` tests the built artifact. It runs `npm run build` and serves `dist`, because Safari
 on an iPad is given `dist` and a font that arrives in dev is not evidence about the one that ships
 — under the suite's own parallel load the dev server was in fact leaving font requests unanswered,
