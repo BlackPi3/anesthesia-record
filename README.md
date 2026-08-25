@@ -3,6 +3,30 @@
 A digital anesthesia record (*Narkoseprotokoll*) for ambulatory (outpatient) procedures — built for
 iPad and desktop, for use by an anesthesiologist during a real case.
 
+**[Open the live demo →](https://blackpi3.github.io/anesthesia-record/)** — fictional data, German
+interface. Best on an iPad, or in a desktop browser at a reasonable width.
+
+## What this is
+
+A portfolio project, finished rather than abandoned: the app works end to end, the demo is live, the
+[user stories are recorded](#recorded-user-stories), and every non-obvious decision is written down
+with what was rejected and why.
+
+It was built in August 2026 against a specification for a *Digitales Narkoseprotokoll* from
+[Sikant](https://sikant.de), a German med-tech company, and submitted. What is interesting about the
+problem is that it is unusually interaction-heavy for its size: the hard part is not storing a
+number, it is letting someone put a number on a chart with a fingertip, correct it without losing
+what it was before, and do both while managing a patient.
+
+**It is not clinical software and has never been used on a real case.** The patient is fictional,
+the values are invented, and the app calculates nothing and recommends nothing — a deliberate
+constraint, kept even where the arithmetic would be trivial. See
+[Known limitations](#known-limitations).
+
+Worth a look first, if you are reading the code: [`src/timeline/scales.ts`](src/timeline/scales.ts)
+for the coordinate maths, [`docs/decisions.md`](docs/decisions.md) for the reasoning, and
+[`CLAUDE.md`](CLAUDE.md) for how the whole thing was actually built.
+
 ## Problem
 
 During an outpatient procedure, an anesthesiologist continuously documents vitals, medications,
@@ -24,13 +48,11 @@ Every entry is timestamped, visible the moment it's entered, and correctable aft
 clear trail of what changed. The case survives a page reload without losing anything — the app
 persists data locally in the browser; no backend is used, by design (see below).
 
-Built for [Sikant's](https://sikant.de) coding challenge (*Digitales Narkoseprotokoll*).
-
 ---
 
 [Status](#status) · [Data model](#data-model) · [Design decisions](#current-design-decisions) ·
 [Timeline](#timeline) · [Entering a value](#entering-a-value) · [Setup](#setup) ·
-[Trying it on an iPad](#trying-it-on-an-ipad) · [Recorded user stories](#recorded-user-stories) ·
+[Live demo](#live-demo) · [Recorded user stories](#recorded-user-stories) ·
 [Agent usage](#agent-usage) · [Known limitations](#known-limitations)
 
 ---
@@ -83,8 +105,8 @@ Blood pressure is three `vital` entries — systolic, *MAD* (*Mittlerer arteriel
 mean) and diastolic — sharing one timestamp, so every vital entry carries exactly one number.
 
 Times are epoch milliseconds. Corrections are non-destructive: editing pushes the previous values
-onto the entry's `revisions`, and removal sets `deletedAt`, so the record keeps the audit trail
-the brief asks for.
+onto the entry's `revisions`, and removal sets `deletedAt`, so nothing a clinician wrote is ever
+overwritten or dropped — the record keeps a complete trail of what it used to say.
 
 `src/domain/catalog.ts` holds the per-vital German labels, units, plotted axis ranges, and the
 wider ranges the value control accepts. Both the chart and the entry control read their numbers
@@ -121,14 +143,16 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
   entries, so correcting one afterwards touches only that one.
 - **The time grid is two weights** — a hairline every five minutes, a rule every fifteen, and only
   the fifteens are labelled. It is a visual and clinical reference, matching how vitals are
-  conventionally charted, not a constraint: entries can land at any exact time. Both bands are
-  ruled from the same window and the same plot edges as the lanes, because a dose with no time
-  under it is not on a shared timeline.
-- **Local persistence only**, no backend — a mandatory constraint from the challenge brief, and
-  also the right scope for what's being evaluated here.
-- **App framework: React Router + Vite**, over Next.js. The brief permits either; Next.js's main
-  advantages (server rendering, API routes) solve problems this backend-less app doesn't have, so
-  React Router keeps the whole app as plain client-side React.
+  conventionally charted; it does not currently constrain anything, and entries land at whatever
+  exact time they were taken — see [Known limitations](#known-limitations), where that turns out to
+  be the wrong default. Both bands are ruled from the same window and the same plot edges as the
+  lanes, because a dose with no time under it is not on a shared timeline.
+- **Local persistence only**, no backend. A fixed constraint of the project, and the one that
+  shapes the most: it puts every interesting problem in the browser, which is where this app's
+  problems actually are.
+- **App framework: React Router + Vite**, over Next.js. Next.js's main advantages — server
+  rendering, API routes — solve problems a backend-less app does not have, so React Router keeps
+  the whole thing as plain client-side React with nothing to explain away.
 - **Values are typed, not dialled** — a keypad, not a slider or a wheel. The number is already known
   when the sheet opens, and a gesture can only approximate it: a pixel is worth more than one unit
   on most of these axes.
@@ -137,7 +161,7 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
 
 `src/timeline/` draws the record as one lane per vital parameter over a shared time axis, with
 medications and phase events in bands beneath. It is hand-rolled SVG: charting libraries are
-built to display a dataset, and the graded interaction here runs the other way, mapping a pointer
+built to display a dataset, and the interaction here runs the other way, mapping a pointer
 position back to a timestamp and a value.
 
 The coordinate maths lives in [`src/timeline/scales.ts`](src/timeline/scales.ts) as plain
@@ -302,20 +326,14 @@ test can distinguish a page that scrolled from one that did not.
 Verification in Safari on physical iPad hardware is a separate step that emulation does not
 replace.
 
-## Trying it on an iPad
+## Live demo
 
 **<https://blackpi3.github.io/anesthesia-record/>**
 
-Pushing to `main` builds the app and publishes it there. It exists for one reason: the touch and
-stylus handling was written for Safari on an iPad, and emulation cannot confirm it. It is a preview
-link for testing on hardware, not a deployment — the completeness and deployment part of the brief
-is out of scope and stays that way.
-
-The workflow had been failing on every run since it was added, with *"Ensure GitHub Pages has been
-enabled"*: the build was fine and the deploy 404'd, and nothing said so on the way past. Pages was
-enabled on the repository on 20 August and the run re-run, and the link has served the current
-build since. It is recorded here rather than quietly fixed because this README asserted the link
-worked for as long as it did not, which is the more useful thing to have written down.
+Pushing to `main` runs the lint and unit-test suites, builds the app, and publishes it there; a red
+run publishes nothing. The link began life as something narrower — the touch and stylus handling was
+written for Safari on an iPad and no emulator can confirm it, so it existed to be opened on real
+hardware. It is worth opening on an iPad for that reason still.
 
 Everything is stored in the browser it runs in, so each person who opens the link gets their own
 copy of the demo case and nothing is shared between them. „Demodaten zurücksetzen“ in the header
@@ -373,16 +391,27 @@ Scope decisions, with the reason each one was made.
 
 - **The time axis fits the case to the width available**, rather than holding a fixed number of
   pixels per minute. As a case grows the chart compresses, so an hour late in a long case is
-  narrower than an hour early in a short one. `DESIGN.md` asks for a fixed scale and it is the
-  right answer — the value axes were fixed on exactly that argument, so the app is currently
-  inconsistent with itself. It is not built because it is about a day's work and it moves the
-  `touch-action` handling under the hold-to-drag gesture, which has shipped broken once already.
-  Trading a known compression for a chance of silently rewriting a value on scroll was not worth
-  it in the time left. The sequence it would be built in is written down in `docs/decisions.md`.
-- **Part 3 of the brief — the completeness check and deployment — is not built.** Decided on
-  16 August: two solid parts beat three thin ones. The Pages link above is a hardware test link and
-  is not that deployment.
-- **One case, in one browser.** No backend is a constraint of the brief, and the app takes it
+  narrower than an hour early in a short one. A fixed scale is the right answer, and the app is
+  currently inconsistent with itself about it: the *value* axes are deliberately fixed and never
+  auto-fitted, on the argument that two cases have to be comparable at a glance — which is just as
+  true of the time axis. It is not built because it is about a day's work and it moves the
+  `touch-action` handling under the hold-to-drag gesture, which has shipped broken once already —
+  trading a known compression for a chance of silently rewriting a value on scroll is a bad trade.
+  The sequence it would be built in is written down in
+  [`docs/decisions.md`](docs/decisions.md).
+- **There is no completeness check before a case is closed.** The original specification offered
+  one as optional, and it was cut in August against a deadline on the reasoning that two solid
+  parts beat three thin ones. It is the most obvious next feature: flag a required milestone that
+  was never recorded, a dose with no unit, an infusion still running. Note that all three are
+  questions about the *shape* of the record and none is a judgement about a number in it — it may
+  say *Naht nicht erfasst*, and may never say a dose looks high. That is the same line the
+  no-calculation rule below draws, and it is what keeps such a feature honest.
+- **Entries do not snap to the five-minute grid.** The grid is drawn every five minutes and the
+  chart's own time window is rounded to it, but an entry takes the clock as it is, so points land
+  between the rules. Anesthesiologists chart on the five-minute interval by habit and by training,
+  which makes this the gap most worth closing — with the exact time still editable, because a
+  record that quietly moves a timestamp is a worse problem than an untidy chart.
+- **One case, in one browser.** No backend was a fixed constraint, and the app takes it
   literally: the record lives in `localStorage` on the device that wrote it, there is no second
   case, and nothing is shared between two people opening the same link. Everything that touches
   storage is behind four functions in one file, so a backend would be a change to that file.
@@ -393,9 +422,11 @@ Scope decisions, with the reason each one was made.
 - **Undo goes back 25 steps and there is no redo.** Undo is for the slip just made; it is
   deliberately not persisted, because a reload is where the record stands as documented. Redo is a
   different feature, and `Shift`+`Ctrl`/`Cmd`+`Z` does nothing rather than undoing by accident.
-- **Nothing is calculated and nothing is recommended.** The brief forbids it. MAD is read off the
+- **Nothing is calculated and nothing is recommended.** This is a documentation tool, and a record
+  should hold what a clinician observed rather than what an app inferred. MAD is read off the
   monitor and entered, never derived from the systolic and diastolic already in the record, even
-  though the arithmetic is trivial and the two numbers are right there.
+  though the arithmetic is trivial and the two numbers are right there — a derived number in a
+  clinical record cannot be told apart from a measured one later.
 - **Verification on physical iPad hardware is a separate step** that emulation does not replace.
   The WebKit project runs the suite in the engine Safari uses, at an iPad viewport, with touch —
   which is the closest a machine can get and is not the same thing as a finger on glass.
@@ -405,9 +436,9 @@ Scope decisions, with the reason each one was made.
   and takes the width it is given, and the case header reflows from three lines at 1080px to two at
   1280px. So the two form factors differ in how much chart there is and how the header wraps — but
   a desktop never shows *more* information than an iPad, only the same information at a wider
-  scale. The brief asks for "appropriate information density for both form factors", and this is
-  read as satisfying it; a second column of anything on a desktop would be a design decision about
-  what a desktop is for, and that decision was not made.
+  scale. That is a defensible reading of "appropriate density for both form factors" rather than an
+  unqualified one: a second column of anything on a desktop would be a design decision about what a
+  desktop is *for*, and that decision was never made.
 - **In iPad portrait the header's two buttons take a line of their own.** At 810px wide „Rückgängig“
   and „Demodaten zurücksetzen“ no longer fit beside the patient's name, so they wrap and sit
   right-aligned between the name and the baseline data. It reads loosely — it is the one place in
