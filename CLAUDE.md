@@ -47,8 +47,22 @@ negotiable; the rules after them are corrections folded back in as the build hit
 
 ## Out of scope
 
-**Part 3 is not being built** (completeness check, deployment). Decided 2026-08-16: make Parts 1
-and 2 solid instead. Do not let it creep back in.
+**Part 3 is half built, and the halves are unrelated.** Decided 2026-08-16 to cut it entirely —
+two solid parts beat three thin ones — against a submission deadline that has since passed. That
+constraint is gone, so the decision is reopened rather than quietly ignored.
+
+*The deployment half is done.* The app is public at
+<https://blackpi3.github.io/anesthesia-record/>, carries fictional data only, and is deployed by
+`ci.yml` from a run in which all four checks passed. The brief asks for an "optional public
+deployment (e.g. Vercel) with fictional demo data only" and that is what this is.
+
+*The completeness check is not built, and does not start with code.* It flags three things, all
+structural: a required event never recorded, an entry whose unit is missing, a continuous dosing
+with no end. Every one is about the shape of the record and none is a judgement about a number in
+it — it may say „Naht nicht erfasst" and may never say a dose looks high, which is the same line
+the rule below draws. Open first: a blocking gate before a „finish case" action that does not
+currently exist, or a standing panel readable at any time. The no-confirmation-dialogs rule points
+at the panel. Present it, do not pick it.
 
 **Nothing calculates a medical value or recommends treatment.** The brief forbids it. MAD is read
 off the monitor and entered, never derived from systolic and diastolic.

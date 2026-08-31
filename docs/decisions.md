@@ -736,11 +736,25 @@ release process, and nothing in the app depends on being hosted. Part 3 is not r
 compile and pass what runs without a browser. Playwright is not run there — it needs browser
 downloads, and it is what runs locally before a commit.
 
-> **Superseded 2026-08-31 by *Four checks before the merge, not four checks before the commit*
-> below.** `pages.yml` no longer exists; its build and deploy jobs are the tail of `ci.yml`, and
-> Playwright does now run in CI. What this entry got wrong was the last paragraph: browser
-> downloads are a cache, not an obstacle. What it got right stands — the link is still worth
-> opening on real hardware, and this on its own still does not make Part 3 built.
+> **Superseded 2026-08-31, in two respects.**
+>
+> *On CI*, by *Four checks before the merge, not four checks before the commit* below: `pages.yml`
+> no longer exists, its build and deploy jobs are the tail of `ci.yml`, and Playwright does now run
+> there. What this entry got wrong was the last paragraph — browser downloads are a cache, not an
+> obstacle.
+>
+> *On Part 3*, the paragraph headed „What this is not" no longer describes what this is. It was
+> written on 2026-08-20 against a submission deadline, when the link existed only to be opened on an
+> iPad. The brief's deployment half asks for an *"optional public deployment (e.g. Vercel) with
+> fictional demo data only"*, and that is now what this is: a public URL carrying an obviously
+> synthetic case, offered at the top of the README as the way to meet the app, with
+> „Demodaten zurücksetzen" for the visitor who edits it. Nothing in the app depends on being hosted,
+> which was true then and stays true — but that was never what the brief asked for.
+>
+> **What is still not built is the other half: the completeness check.** Part 3 is therefore half
+> done rather than out of scope, and the half that remains is the one that needs a decision — a
+> blocking gate before a „finish case" action, or a standing panel readable at any time — before it
+> needs any code.
 
 ---
 
