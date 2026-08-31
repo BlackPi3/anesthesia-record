@@ -13,9 +13,11 @@
 
 import { Button, Tag, Typography } from 'antd'
 
+import { Completeness } from './Completeness'
 import { PHASE_EVENTS } from './domain/catalog'
 import { phaseEvents } from './domain/entries'
 import type { AnesthesiaCase } from './domain/types'
+import type { AddTarget } from './entry/target'
 import { ageAt, formatDate, formatNumber, formatTime } from './format'
 import type { SaveState } from './useCase'
 
@@ -56,9 +58,20 @@ export interface CaseHeaderProps {
   canUndo: boolean
   onUndo: () => void
   onReset: () => void
+  /** The completeness check opens the entry sheets, so it is handed the two the record uses. */
+  onAdd: (target: AddTarget) => void
+  onEdit: (id: string) => void
 }
 
-export function CaseHeader({ record, save, canUndo, onUndo, onReset }: CaseHeaderProps) {
+export function CaseHeader({
+  record,
+  save,
+  canUndo,
+  onUndo,
+  onReset,
+  onAdd,
+  onEdit,
+}: CaseHeaderProps) {
   const { patient, baseline } = record
 
   /**
@@ -134,6 +147,10 @@ export function CaseHeader({ record, save, canUndo, onUndo, onReset }: CaseHeade
           <Button size="large" onClick={onReset}>
             Demodaten zurücksetzen
           </Button>
+          {/* Beside the save status, because the two are the same kind of thing: what the header
+              knows about the record rather than something to do to it. Absent entirely while the
+              record's shape is sound, which is how the demo case ships. */}
+          <Completeness record={record} onAdd={onAdd} onEdit={onEdit} />
           <SaveStatus save={save} />
         </span>
       </div>

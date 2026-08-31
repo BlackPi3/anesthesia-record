@@ -136,6 +136,11 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
         // A reset is an ordinary update to a fresh demo case, not a separate path through
         // storage: it is written, confirmed and undone exactly like a corrected value.
         onReset={() => update(createDemoCase())}
+        // The completeness check opens the same two sheets the timeline opens, through the same
+        // two pieces of state. A flag is a second way to reach an entry, never a second way to
+        // write one.
+        onAdd={setAdding}
+        onEdit={setEditingId}
       />
       <main className="app__main">
         <Timeline

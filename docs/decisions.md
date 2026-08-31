@@ -751,10 +751,9 @@ downloads, and it is what runs locally before a commit.
 > „Demodaten zurücksetzen" for the visitor who edits it. Nothing in the app depends on being hosted,
 > which was true then and stays true — but that was never what the brief asked for.
 >
-> **What is still not built is the other half: the completeness check.** Part 3 is therefore half
-> done rather than out of scope. Its shape was decided on 2026-09-01 — a count in the header,
-> beside the „Gespeichert" status, opening the list in a sheet — over a blocking gate and over a
-> standing panel; the entry for it goes here when it is built, not before.
+> **The other half, the completeness check, was built on 2026-09-01** — see *The completeness check
+> is a chip in the header, and a flag is a contradiction* at the end of this file. Part 3 is
+> therefore done, not half done and not out of scope.
 
 ---
 
@@ -1592,6 +1591,93 @@ bypassed, and bypassing it would cost the three that are worth having. Two limit
 it checks the working tree rather than the staged content (`lint-staged` would fix that and is not
 worth a dependency at this size), and `--no-verify` skips it, which is the honest split — the local
 check is a convenience, the remote one is the gate.
+
+---
+
+## 2026-09-01 — The completeness check is a chip in the header, and a flag is a contradiction
+
+**What:** Part 3(a) is built. `src/domain/completeness.ts` reads a case and returns what is
+structurally wrong with it — the three the challenge names: a required milestone never recorded, an
+entry whose unit is missing, a continuous dosing with no end. A count appears in the header beside
+the „Gespeichert“ status („Offen (2)“) and opens the list in the same sheet the entry controls use.
+Pressing a row opens the entry sheet that fixes it. When nothing is wrong there is no chip at all,
+which is how the demo case ships.
+
+**Every flag is about the shape of the record and none is a judgement about a number in it.** It may
+say „Naht nicht erfasst“ and may never say a dose looks high. That is the challenge's own second
+bullet — *does not calculate medical values or provide treatment recommendations* — and the same
+line the no-calculation rule draws for MAD, arrived at from the other side. The sheet says so out
+loud: *Geprüft wird die Form des Protokolls, nicht die Messwerte.*
+
+**The check prompts; it never writes.** A flag naming Narkosebeginn opens the milestone sheet on
+Narkosebeginn and then waits for „Übernehmen“. The app filling it in would put a milestone in the
+record that nobody documented, and „the app inferred it“ is not a provenance a clinical document can
+carry. What the flag saves is the picker step, not the decision.
+
+### A chip, not a gate and not a standing panel
+
+**Rejected — a blocking gate** before a „finish case“ action. Two costs, either enough on its own:
+the app has no such action, so the gate would first have to invent what finishing a case means,
+whether it can be undone and what follows it; and a modal between the user and their record is a
+confirmation dialog, which this app does not have by rule. Its one genuine advantage is that it
+costs no pixels at rest.
+
+**Rejected — a standing panel.** Horizontal room on the iPad is the scarcest thing on this canvas —
+it is why the gutter is 88px and why the lane names are abbreviated — and a permanently-occupied
+region spends it on a message that is usually empty. The chip costs about 70px of header when there
+is something to say and nothing when there is not.
+
+### When a flag is allowed to fire, which is the decision that mattered
+
+**A flag is a contradiction inside the record, never „you are not finished yet“.** The obvious rule
+is wrong: a case that has just been induced has four of its five milestones unrecorded because three
+of them have not happened, so checking them outright puts „Offen (4)“ on a record with nothing
+whatever wrong with it, for most of the operation. A warning that fires on the normal case is worse
+than no warning. So each rule waits for something already in the record to contradict what is
+absent:
+
+- a milestone is missing only once a **later** one is recorded — Naht at 09:11 with no Schnitt is a
+  hole somebody has to explain;
+- an infusion has no end only once **Entlassung** is recorded — running is a state the record is
+  built to hold, and it becomes an omission when the record also says the patient went home;
+- a unit is checked always, because there is no moment at which a dose is legitimately given in
+  nothing.
+
+Each flag carries the entry that proves it, and the list shows it: „Naht ist um 09:11 erfasst“ under
+„Schnitt nicht erfasst“. A flag that cannot say why it fired asks to be believed.
+
+**What this gives up, deliberately:** a record that simply stops after Naht is never flagged for the
+two milestones it never reached. The check says the record is inconsistent; it never says the record
+is unfinished. **The alternative was to wake the check at Ausleitungsende** and then count
+everything still missing, which does catch „Entlassung nicht erfasst“ and is closer to the
+challenge's own phrase *pre-submission validation*. It was rejected because it means reading „the
+anaesthetic is over“ off a single event — the conclusion *The record says which phase it is in*
+above explicitly refuses to draw, on the grounds that the header restates what was documented and
+concludes nothing about the patient. A second feature quietly drawing it would make that entry
+false.
+
+### Two defects the check surfaced on its way in
+
+Neither was introduced here; both were reachable before this feature existed and had nothing to
+find them.
+
+**A dose whose unit is unknown crashed the sheet that would have fixed it.** `bolusAmount` looked
+its unit up in `BOLUS_RANGES`, got `undefined`, and spread it into an `AmountMeta` with no `max`;
+`ValueField` then threw on `max.toFixed`. `catalog.ts` now falls back to a wide, fine `UNKNOWN_UNIT`
+range — wide and fine on purpose, because the number under it is already documented and a tidier
+step would round a recorded dose on the way to the screen.
+
+**And the unit picker claimed a unit the record did not hold.** AntD's `Segmented` has no unselected
+state: handed a `value` matching no option it highlights the first, so a dose with no unit was
+displayed as „mg“ — a value the record does not contain, shown as though it did — and because AntD
+believed „mg“ was already selected, pressing it fired no change, so the correction could not be
+made. The picker now shows an unknown unit as its own option labelled „fehlt“, the same word the
+flag uses, and `isComplete` refuses the entry until a real one is chosen.
+
+Both are only reachable through `storage.ts`, whose guard checks an entry's id, type and timestamps
+and deliberately stops there. That is the honest description of this rule: **the unit check does not
+guard the forms, it guards the other way in** — and it is why its Playwright test edits the app's own
+stored envelope and reloads, rather than asserting against a case the interface cannot produce.
 
 ---
 
