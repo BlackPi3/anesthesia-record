@@ -9,13 +9,22 @@
  */
 
 import type { LaneDef } from '../domain/catalog'
-import type { VitalKind } from '../domain/types'
+import type { PhaseEventKind, VitalKind } from '../domain/types'
 
 export type AddTarget =
   | { kind: 'vital'; vital: VitalKind }
   | { kind: 'bloodPressure' }
   | { kind: 'medication' }
-  | { kind: 'event' }
+  /**
+   * The band's own button leaves `event` out and gets the picker, because it is asking which
+   * milestone. The completeness check fills it in: a flag reading „Schnitt nicht erfasst" already
+   * named one, and offering the list again would be asking a question it just answered.
+   *
+   * Naming the milestone is as far as it goes. The sheet still opens on a draft the user has to
+   * accept, with the timestamp they choose, so the entry stays theirs — the check prompts, it
+   * never writes. See `_private/Backlog.md`, item 7.
+   */
+  | { kind: 'event'; event?: PhaseEventKind }
 
 /**
  * What a lane's own button opens.
@@ -32,5 +41,8 @@ export function targetForLane(lane: LaneDef): AddTarget {
 
 /** Stable identity for a target, so the sheet mounts fresh when a different button opens it. */
 export function targetKey(target: AddTarget): string {
-  return target.kind === 'vital' ? `vital:${target.vital}` : target.kind
+  if (target.kind === 'vital') return `vital:${target.vital}`
+  // Two milestone flags in a row have to remount the sheet, or the second opens on the first.
+  if (target.kind === 'event' && target.event !== undefined) return `event:${target.event}`
+  return target.kind
 }

@@ -72,8 +72,11 @@ export function AddEntry({ record, target, onAdd, onClose }: AddEntryProps) {
   const [mode, setMode] = useState<MedicationMode>('bolus')
   const [draft, setDraft] = useState<NewDraft | null>(() => openingDraft(record, target))
   // A picker is a step that can be gone back to. A row's button has no step behind it, so its
-  // sheet offers a way out rather than a way back.
-  const picks = target.kind === 'medication' || target.kind === 'event'
+  // sheet offers a way out rather than a way back — and neither does a milestone the completeness
+  // check already named, which is why this asks whether a choice was made rather than what kind of
+  // target it is.
+  const picks =
+    target.kind === 'medication' || (target.kind === 'event' && target.event === undefined)
 
   function back() {
     if (picks && draft !== null) return setDraft(null)
@@ -151,6 +154,7 @@ function pickerTitle(target: AddTarget): string {
 function openingDraft(record: AnesthesiaCase, target: AddTarget): NewDraft | null {
   if (target.kind === 'vital') return newVital(record, target.vital)
   if (target.kind === 'bloodPressure') return newBloodPressure(record)
+  if (target.kind === 'event' && target.event !== undefined) return newEvent(record, target.event)
   return null
 }
 

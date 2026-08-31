@@ -76,14 +76,21 @@ Everything the record holds can be written, corrected and removed, and the case 
 - **Saving** is immediate and confirmed in the header. A record with nothing in it says so, and a
   stored case this version cannot read offers to be discarded rather than leaving the app with no
   way forward.
+- **Completeness** is reported as a count beside the save status — „Offen (2)“ — opening a list of
+  what is structurally missing: a milestone stepped over, a dose with no unit, a *Dauerinfusion*
+  left running past the discharge. Each row carries the entry in the record that proves it, and
+  opens the sheet that fixes it. Nothing there reads a measured value, and nothing is written
+  without „Übernehmen“. When the record's shape is sound the header carries no chip at all, which
+  is how the demo case ships — see [Known limitations](#known-limitations) for what it will not
+  say.
 
 The domain layer holds the case and entry types, the vital/event catalogue with its German labels
 and ranges, the local-storage persistence layer, and a fictional demo case.
 
-99 unit tests cover the domain layer, the keypad's typing rules, and the timeline's coordinate and
-label-placement maths. 99 Playwright tests run across desktop Chrome, an iPad-sized viewport with
-touch, and WebKit — 291 runs in all, of which 11 are skipped by design: the stories are recorded
-once on Chromium, and the touch gestures can only be driven there.
+116 unit tests cover the domain layer, the completeness rules, the keypad's typing rules, and the
+timeline's coordinate and label-placement maths. 108 Playwright tests run across desktop Chrome, an
+iPad-sized viewport with touch, and WebKit — 318 runs in all, of which 11 are skipped by design:
+the stories are recorded once on Chromium, and the touch gestures can only be driven there.
 
 ## Data model
 
@@ -401,13 +408,14 @@ Scope decisions, with the reason each one was made.
   trading a known compression for a chance of silently rewriting a value on scroll is a bad trade.
   The sequence it would be built in is written down in
   [`docs/decisions.md`](docs/decisions.md).
-- **There is no completeness check before a case is closed.** The original specification offered
-  one as optional, and it was cut in August against a deadline on the reasoning that two solid
-  parts beat three thin ones. It is the most obvious next feature: flag a required milestone that
-  was never recorded, a dose with no unit, an infusion still running. Note that all three are
-  questions about the *shape* of the record and none is a judgement about a number in it — it may
-  say *Naht nicht erfasst*, and may never say a dose looks high. That is the same line the
-  no-calculation rule below draws, and it is what keeps such a feature honest.
+- **The completeness check reports contradictions, not unfinished records.** It flags a milestone
+  only once a later one is recorded, and an infusion with no end only once *Entlassung* is. So a
+  record that simply stops after *Naht* is never flagged for the two milestones it never reached:
+  the check says the record is inconsistent, and never says it is incomplete. Saying that would
+  mean reading „the anaesthetic is over" off a single event, which is a conclusion this app
+  declines to draw anywhere — the header restates which phase was documented last and decides
+  nothing about whether the case is running. The alternative, waking the check at
+  *Ausleitungsende*, is written up with its trade-off in [`docs/decisions.md`](docs/decisions.md).
 - **Entries do not snap to the five-minute grid.** The grid is drawn every five minutes and the
   chart's own time window is rounded to it, but an entry takes the clock as it is, so points land
   between the rules. Anesthesiologists chart on the five-minute interval by habit and by training,

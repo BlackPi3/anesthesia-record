@@ -47,25 +47,27 @@ negotiable; the rules after them are corrections folded back in as the build hit
 
 ## Out of scope
 
-**Part 3 is half built, and the halves are unrelated.** Decided 2026-08-16 to cut it entirely —
-two solid parts beat three thin ones — against a submission deadline that has since passed. That
-constraint is gone, so the decision is reopened rather than quietly ignored.
+**Part 3 is built, in both halves.** It was cut on 2026-08-16 — two solid parts beat three thin
+ones — against a submission deadline that has since passed; that constraint is gone and the
+decision was reopened rather than quietly ignored.
 
-*The deployment half is done.* The app is public at
-<https://blackpi3.github.io/anesthesia-record/>, carries fictional data only, and is deployed by
-`ci.yml` from a run in which all four checks passed. The brief asks for an "optional public
-deployment (e.g. Vercel) with fictional demo data only" and that is what this is.
+*The deployment half.* The app is public at <https://blackpi3.github.io/anesthesia-record/>,
+carries fictional data only, and is deployed by `ci.yml` from a run in which all four checks
+passed. The brief asks for an "optional public deployment (e.g. Vercel) with fictional demo data
+only" and that is what this is.
 
-*The completeness check is not built, and does not start with code.* It flags three things, all
-structural: a required event never recorded, an entry whose unit is missing, a continuous dosing
-with no end. Every one is about the shape of the record and none is a judgement about a number in
-it — it may say „Naht nicht erfasst" and may never say a dose looks high, which is the same line
-the rule below draws. **Its shape is decided (2026-09-01): a count in the header, beside the
-„Gespeichert" status, opening the list in a sheet.** Not a blocking gate, which would need a
-„finish case" action the app does not have and is a confirmation dialog by another name; and not a
-standing panel, because horizontal room is the scarcest thing on the iPad and a region that is
-usually empty is the wrong thing to spend it on. The chip costs nothing when the record is
-complete. Reasoning and what was rejected: `_private/Backlog.md`, Part 3 (a).
+*The completeness half* is `src/domain/completeness.ts` plus `Completeness.tsx`: a count beside the
+„Gespeichert" status („Offen (2)"), opening the list in a sheet, absent entirely when there is
+nothing to say. **Every flag is about the shape of the record and none is a judgement about a
+number in it** — it may say „Naht nicht erfasst" and may never say a dose looks high, which is the
+same line the rule below draws. **A flag is a contradiction inside the record, never „you are not
+finished yet":** a milestone counts as missing only once a later one is recorded, an infusion has
+no end only once Entlassung is recorded, a unit is checked always. Otherwise a case that has just
+been induced reads „Offen (4)" while nothing is wrong with it, and a warning that fires on the
+normal case is worse than none. **The check prompts and never writes** — a flag opens the entry
+sheet on the milestone it names and waits for „Übernehmen", because a record where the app authored
+a milestone can no longer be read as what the anesthesiologist observed. What was rejected, and the
+one thing this deliberately gives up, is in `docs/decisions.md` (2026-09-01).
 
 **Nothing calculates a medical value or recommends treatment.** The brief forbids it. MAD is read
 off the monitor and entered, never derived from systolic and diastolic.
