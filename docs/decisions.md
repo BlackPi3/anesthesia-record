@@ -1567,6 +1567,18 @@ are seconds and already habitual; the slow one is what needed moving).
 worth having. `npm run e2e` moves to CI, and is run locally when something geometric has been
 touched and the answer is wanted now.
 
+**Amended the same day: the local half is now a git hook, not a habit.** Leaving it to memory was
+the thing this entry objected to, and CI answering for the slow check does not answer for the fast
+three. `.githooks/pre-commit` runs lint, the unit tests and the build — 5.1 seconds together — and
+refuses the commit if any fails. Not husky: git runs a pre-commit script on its own, and the only
+thing the package adds is committing the hook so a fresh clone gets it, which `"prepare": "git
+config core.hooksPath .githooks"` does in one line and no dependency, since npm runs `prepare` after
+an install. `npm run e2e` is deliberately left out — a hook that costs minutes is a hook that gets
+bypassed, and bypassing it would cost the three that are worth having. Two limits kept on purpose:
+it checks the working tree rather than the staged content (`lint-staged` would fix that and is not
+worth a dependency at this size), and `--no-verify` skips it, which is the honest split — the local
+check is a convenience, the remote one is the gate.
+
 ---
 
 ## Open decisions (not yet made)
