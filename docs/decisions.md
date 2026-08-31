@@ -736,6 +736,12 @@ release process, and nothing in the app depends on being hosted. Part 3 is not r
 compile and pass what runs without a browser. Playwright is not run there — it needs browser
 downloads, and it is what runs locally before a commit.
 
+> **Superseded 2026-08-31 by *Four checks before the merge, not four checks before the commit*
+> below.** `pages.yml` no longer exists; its build and deploy jobs are the tail of `ci.yml`, and
+> Playwright does now run in CI. What this entry got wrong was the last paragraph: browser
+> downloads are a cache, not an obstacle. What it got right stands — the link is still worth
+> opening on real hardware, and this on its own still does not make Part 3 built.
+
 ---
 
 ## 2026-08-20 — Palette cut to six interface values plus four traces
@@ -1512,6 +1518,54 @@ matched `[aria-label="Temperatur erfassen"]` exactly, which stopped matching whe
 name gained its abbreviation — a selector aimed at a string nothing checks. And the search window
 was ±20px around the block's centre, which reports a 44px target as 40: the interval it searched
 was inside the target at both ends, so it measured itself.
+
+---
+
+## 2026-08-31 — Four checks before the merge, not four checks before the commit
+
+**What:** `.github/workflows/ci.yml` runs lint, the unit tests, the build and the full Playwright
+suite on every pull request and on every push to `main`, and deploys to Pages only from a run in
+which all four passed. `pages.yml` is gone; its two jobs are the tail of this one file. `main` is
+protected: a pull request is required, status checks must pass, and only rebase merging is allowed.
+
+**Why:** `CLAUDE.md` has asked for all four green before a commit since the first week, and that was
+true because Parham ran them. A rule enforced by memory is not enforced on the evening it matters,
+and it cannot be enforced at all on a clean machine — `npm ci` from the lockfile catches the
+dependency that is installed here and declared nowhere. The suite most worth running is also the one
+least likely to be run: `npm run e2e` is 237 runs across three browsers and costs minutes, so it is
+the check discipline drops first, and every pointer test in it is geometry.
+
+**Why the deploy waits on the tests.** The alternative is two independent workflows, where the link
+goes live on the build and the suite reports separately. That is faster to `main` and it means a
+green public link can sit over a red pointer suite. Rejected: this repo is a portfolio piece, so the
+link is what a stranger meets first, and a subtly broken record costs more than five minutes of
+latency. Waiting also answers the failure mode that is more common than having no CI at all — a
+suite that goes flaky and is quietly ignored. If the tests can stop the deploy, a red run has to be
+dealt with rather than scrolled past.
+
+**Why one file rather than the `ci.yml` / `pages.yml` split the backlog proposed.** Two workflows
+can only be sequenced with `workflow_run`, which fires on a run that has already finished; `needs:`
+inside one workflow is the same intent in one line. The split is the right shape only when nothing
+downstream waits.
+
+**Why `push` is narrowed to `main` rather than firing on every branch.** The backlog asked for both
+on any branch. A branch with an open pull request would then be tested twice, and the second run
+proves nothing the first did not — `pull_request` is already the gate that fails before the merge.
+A branch with no pull request open is not yet asking to become `main`.
+
+**Why the e2e job does not wait on lint.** Running them in series would delay the geometry result by
+the length of a lint run for no information gained. They are independent; the deploy waits on both.
+
+**Rejected:** *required reviewers* (GitHub does not let an author approve their own pull request, so
+any number above zero locks a solo repo); *squash merging* (collapses a branch into one generated
+commit, and the commit history is a graded deliverable here — 59 commits, one coherent unit each);
+*a coverage threshold* (a percentage does not answer the question `CLAUDE.md` asks about a test,
+which is what would still pass if the feature were deleted); *a pre-commit hook* (the fast checks
+are seconds and already habitual; the slow one is what needed moving).
+
+**What moves, in practice:** the fast three stay local, before a commit, because instant feedback is
+worth having. `npm run e2e` moves to CI, and is run locally when something geometric has been
+touched and the answer is wanted now.
 
 ---
 

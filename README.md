@@ -330,8 +330,10 @@ replace.
 
 **<https://blackpi3.github.io/anesthesia-record/>**
 
-Pushing to `main` runs the lint and unit-test suites, builds the app, and publishes it there; a red
-run publishes nothing. The link began life as something narrower — the touch and stylus handling was
+Pushing to `main` runs all four checks — lint, the unit tests, the build and the full Playwright
+suite across the three browser projects — and publishes only if every one passes; a red run
+publishes nothing, so the link is never live over a failing suite. The same four run on every pull
+request, before anything reaches `main`. The link began life as something narrower — the touch and stylus handling was
 written for Safari on an iPad and no emulator can confirm it, so it existed to be opened on real
 hardware. It is worth opening on an iPad for that reason still.
 
@@ -340,8 +342,8 @@ copy of the demo case and nothing is shared between them. „Demodaten zurückse
 puts the case back the way it ships, discarding whatever was entered while trying it out;
 „Rückgängig“ takes the reset back like any other change.
 
-`BASE_PATH` in the workflow must match the repository name, because Pages serves the site under
-`/<repo>/`.
+`BASE_PATH` in `.github/workflows/ci.yml` must match the repository name, because Pages serves the
+site under `/<repo>/`.
 
 ## Recorded user stories
 

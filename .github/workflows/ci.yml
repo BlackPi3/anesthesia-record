@@ -1,0 +1,127 @@
+# The four checks, run on a machine that is not this one.
+#
+# `CLAUDE.md` asks for lint, unit tests, build and Playwright green before every commit. That was
+# enforced by discipline; here it is enforced by the merge button. Every pull request runs all four,
+# and `main` is deployed only by a run in which all four passed.
+#
+# One file rather than a `ci.yml` / `pages.yml` split, because the deploy waits on the tests. Two
+# workflows would have to coordinate through `workflow_run`, which reports on a run that has already
+# finished; a `needs:` inside one workflow is the same intent in one line. The cost of waiting is a
+# slower `main`; what it buys is that the live link is never up over a red suite.
+name: CI
+
+on:
+  # `pull_request` is the gate — it fails before the merge, which is the whole point.
+  # `push` is narrowed to `main` so a branch with an open PR is not tested twice, and so that
+  # merging is what triggers the deploy.
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch wins over one still running.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Everything that runs without a browser. Seconds, so it is not worth gating anything on.
+  checks:
+    name: Lint, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+      # `npm run build` is `tsc -b && vite build`: the type check is in here, and Vite alone would
+      # not do it.
+      - run: npm run build
+        env:
+          # Must match the repository name: Pages serves the site under /<repo>/.
+          BASE_PATH: /anesthesia-record/
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'push'
+        with:
+          path: dist
+
+  # Deliberately not `needs: checks`. A lint error would delay the geometry result by two minutes
+  # for no gain, and the pointer tests are the ones worth knowing about first.
+  e2e:
+    name: Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Keyed on Playwright's own version, not on the lockfile hash: the browsers change when
+      # Playwright does, and nothing else in the lockfile should throw away three downloads.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps
+
+      # The browsers are cached; the system libraries they link against are not, and live outside
+      # the cached directory.
+      - name: Install browser system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps
+
+      # `playwright.config.ts` starts its own server with `npm run build && npm run preview`, so
+      # this runs against the built artifact, not a dev server.
+      - run: npm run e2e
+
+      # A red run that keeps nothing tells you only that something is red. The HTML report carries
+      # the traces and the retained video with it.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+  deploy:
+    name: Deploy to Pages
+    needs: [checks, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # Not cancelled in progress: a half-finished Pages deploy is worse than a stale one.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
