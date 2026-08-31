@@ -1,0 +1,18 @@
+#!/bin/sh
+# The three checks that run in under five seconds, before every commit.
+#
+# The fourth — `npm run e2e` — is deliberately not here. It is 237 runs across three browsers and
+# costs minutes, and CI runs it on every pull request, which is the whole reason it was moved
+# there. A hook that takes minutes is a hook that gets bypassed.
+#
+# `npm run build` is `tsc -b && vite build`: the type check is in it, and Vite alone does not type
+# check, so this is the only one of the three that catches a type error.
+#
+# This checks the working tree, not what is staged — a dirty file you did not stage is still
+# checked. `git commit --no-verify` skips the hook entirely, which is left available on purpose:
+# CI is the gate that cannot be waved through, and this one is a convenience.
+set -e
+
+npm run lint
+npm test
+npm run build
