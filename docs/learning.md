@@ -713,6 +713,61 @@ It also cost about twenty minutes of edits to a test that had been correct the w
 
 ---
 
+## 2026-08-31 — Two green tests that were only green on this laptop
+
+The first CI run failed four tests that pass here and have passed here every time. Neither failure
+was a defect in the app, and both were the same kind of mistake: **a test whose inputs include
+something about this machine that nobody wrote down.**
+
+### The clock belongs to the browser, not to Node
+
+`creation.spec.ts` entered a heart rate at 09:40, read the stored entry back, and asserted
+`new Date(created.at).getHours()` was 9. On the runner it was 7.
+
+`playwright.config.ts` sets `timezoneId: 'Europe/Berlin'`, and it works — the saved-at stamp in the
+failure's own page snapshot reads „Gespeichert 22:28", which is Berlin for a run at 20:28 UTC. But
+that setting configures the *browser*. The assertion runs in Node, which uses the machine's zone,
+and this machine is on Berlin time. Two clocks that agree locally and differ by two hours in CI.
+
+`CLAUDE.md` already says `Date.now()` is an input; the timezone is the same hidden input wearing
+different clothes. Fixed by naming the zone in the assertion — `Intl.DateTimeFormat` with
+`timeZone: 'Europe/Berlin'` — rather than by setting `TZ` on the CI job, which would have made the
+suite pass by making the runner resemble this desk.
+
+**Reproducible in one command, which is the part worth keeping:** `TZ=UTC npx playwright test
+tests/creation.spec.ts` fails on the old assertion and passes on the new one. A whole class of
+"only fails in CI" is a `TZ=` away from being local.
+
+### A group's bounding box is not the surface it draws
+
+`values.spec.ts` asserts that no two value labels are written over each other. It selected
+`[data-value-box]`, which is the `<g>`, and measured that. A group's bounding box is the union of
+its children, so it covered the `<rect>` *and* the `<text>` — and the text's line box reaches past
+the surface it sits on: 19px measured against an 18px rect.
+
+That extra pixel is not painted and hides nothing. It is also not the same size everywhere, because
+FreeType and CoreText round a font's ascent and descent differently, and on the Linux runner it
+grew past 21 — which is exactly the vertical distance between the two labels that then "collided".
+The label positions were identical to the pixel; the failing pair is at x=187.03 and x=211.77 in
+both, and only the measured heights differ.
+
+The tell was in the test's own comment: *"the surfaces are opaque, so one drawn over another hides
+a number."* It says surfaces, it means the rects, and it was measuring the group. Fixed by
+selecting `[data-value-box] rect`.
+
+Worth noticing that the fonts were never in doubt: `typography.spec.ts` passed on all three CI
+projects, and it is strict — computed family, `document.fonts` state, and advance width checked
+against the shipped `.woff2` within a pixel. Without it the obvious guess would have been the font,
+and the obvious guess had already been the font once before, on 2026-08-20.
+
+### What both have in common
+
+Neither test was wrong about the app. Both were wrong about what they were measuring, and both
+looked right for weeks because this laptop supplied the missing half of the assertion. A second
+machine is the cheapest way to find that out, and it found two on its first run.
+
+---
+
 ## Open questions to revisit
 
 - German terminology in `src/domain/catalog.ts`: `RR` (Riva-Rocci) is the conventional

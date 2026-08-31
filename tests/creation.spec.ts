@@ -109,9 +109,18 @@ test('the timestamp defaults into the case and is adjustable', async ({ page }) 
 
   await commit(page)
 
+  // Read back in the case's timezone rather than the runner's. `timezoneId` in the Playwright
+  // config sets the *browser's* clock; this line runs in Node, which keeps the machine's. On a
+  // laptop set to Berlin the two agree and the dependency is invisible — on a UTC CI runner it is
+  // two silent hours, which is how this was found. Same reasoning as `caseNow`: the clock is an
+  // input, so it gets named rather than inherited.
   const created = (await storedVitals(page, 'heartRate')).at(-1)
-  const at = new Date(created.at)
-  expect(`${at.getHours()}:${String(at.getMinutes()).padStart(2, '0')}`).toBe('9:40')
+  const at = new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(created.at))
+  expect(at).toBe('09:40')
 })
 
 test('a value can be entered and then corrected on the chart', async ({ page }) => {
