@@ -73,10 +73,18 @@ test('a tap on the chart writes every value out and takes the trend lines away',
 test('no two values are written over each other', async ({ page }) => {
   await tapEmptyChart(page)
 
-  // Asserted on the boxes rather than the digits: the surfaces are opaque, so one drawn over
+  // Asserted on the surfaces rather than the digits: the rects are opaque, so one drawn over
   // another hides a number even where the digits inside them would have missed each other.
+  //
+  // And on the `rect` rather than on the `[data-value-box]` group that holds it. A group's
+  // bounding box is the union of its children, so it includes the text's line box, which reaches
+  // a little past the surface it is written on and reaches a different distance on every platform:
+  // 19px against an 18px rect here, over 21px on a Linux runner, because FreeType and CoreText
+  // round a font's ascent and descent differently. That pixel is not painted, hides nothing, and
+  // is not what this test is about — but measured, it turned two labels 21px apart into a
+  // collision on CI and nowhere else.
   for (const lane of [SPO2_LANE, BLOOD_PRESSURE_LANE]) {
-    const inLane = page.getByRole('group', { name: lane }).locator('[data-value-box]')
+    const inLane = page.getByRole('group', { name: lane }).locator('[data-value-box] rect')
     const drawn = await boxesOf(inLane)
     expect(drawn.length).toBeGreaterThan(0)
 
