@@ -60,9 +60,12 @@ deployment (e.g. Vercel) with fictional demo data only" and that is what this is
 structural: a required event never recorded, an entry whose unit is missing, a continuous dosing
 with no end. Every one is about the shape of the record and none is a judgement about a number in
 it — it may say „Naht nicht erfasst" and may never say a dose looks high, which is the same line
-the rule below draws. Open first: a blocking gate before a „finish case" action that does not
-currently exist, or a standing panel readable at any time. The no-confirmation-dialogs rule points
-at the panel. Present it, do not pick it.
+the rule below draws. **Its shape is decided (2026-09-01): a count in the header, beside the
+„Gespeichert" status, opening the list in a sheet.** Not a blocking gate, which would need a
+„finish case" action the app does not have and is a confirmation dialog by another name; and not a
+standing panel, because horizontal room is the scarcest thing on the iPad and a region that is
+usually empty is the wrong thing to spend it on. The chip costs nothing when the record is
+complete. Reasoning and what was rejected: `_private/Backlog.md`, Part 3 (a).
 
 **Nothing calculates a medical value or recommends treatment.** The brief forbids it. MAD is read
 off the monitor and entered, never derived from systolic and diastolic.
