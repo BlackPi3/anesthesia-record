@@ -236,12 +236,30 @@ const INFUSION_RANGES: Record<InfusionRateUnit, UnitRange> = {
 export const BOLUS_UNITS = Object.keys(BOLUS_RANGES) as BolusUnit[]
 export const INFUSION_UNITS = Object.keys(INFUSION_RANGES) as InfusionRateUnit[]
 
+/**
+ * The control's bounds when the record holds a unit this build has no range for.
+ *
+ * The types say this cannot happen and the entry sheet cannot produce it — and storage can. The
+ * guard in `storage.ts` checks an entry's id, type and timestamps and deliberately stops there, so
+ * a hand-edited or older envelope loads a dose whose unit is absent or is a string that used to
+ * mean something. Without a fallback the lookup gave `undefined`, the spread produced an
+ * `AmountMeta` with no `max`, and the sheet threw on `max.toFixed` the moment it was opened: the
+ * one entry that needs correcting was the one entry that could not be opened.
+ *
+ * Wide and fine on purpose. This bounds a control and nothing else, and the number under it is
+ * already documented — a step or a precision chosen to look tidy would round a recorded dose on
+ * the way to the screen, which is a worse failure than the crash it replaces. Two decimals because
+ * `µg/kg/min` is the one rate ordinarily written as a fraction. It lasts exactly as long as it
+ * takes to pick a real unit, which is what the completeness check sends the user here to do.
+ */
+const UNKNOWN_UNIT: UnitRange = { max: 20000, step: 1, decimals: 2 }
+
 export function bolusAmount(unit: BolusUnit): AmountMeta {
-  return { label: 'Dosis', unit, min: 0, ...BOLUS_RANGES[unit] }
+  return { label: 'Dosis', unit, min: 0, ...(BOLUS_RANGES[unit] ?? UNKNOWN_UNIT) }
 }
 
 export function infusionAmount(unit: InfusionRateUnit): AmountMeta {
-  return { label: 'Rate', unit, min: 0, ...INFUSION_RANGES[unit] }
+  return { label: 'Rate', unit, min: 0, ...(INFUSION_RANGES[unit] ?? UNKNOWN_UNIT) }
 }
 
 // ---------------------------------------------------------------------------
