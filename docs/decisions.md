@@ -752,9 +752,9 @@ downloads, and it is what runs locally before a commit.
 > which was true then and stays true — but that was never what the brief asked for.
 >
 > **What is still not built is the other half: the completeness check.** Part 3 is therefore half
-> done rather than out of scope, and the half that remains is the one that needs a decision — a
-> blocking gate before a „finish case" action, or a standing panel readable at any time — before it
-> needs any code.
+> done rather than out of scope. Its shape was decided on 2026-09-01 — a count in the header,
+> beside the „Gespeichert" status, opening the list in a sheet — over a blocking gate and over a
+> standing panel; the entry for it goes here when it is built, not before.
 
 ---
 
