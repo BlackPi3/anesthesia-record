@@ -15,7 +15,13 @@
  * every kind of draft has somewhere to go.
  */
 
-import { BLOOD_PRESSURE_KINDS, PHASE_EVENTS, VITALS } from '../domain/catalog'
+import {
+  BLOOD_PRESSURE_KINDS,
+  BOLUS_UNITS,
+  INFUSION_UNITS,
+  PHASE_EVENTS,
+  VITALS,
+} from '../domain/catalog'
 import {
   addBolus,
   addEvent,
@@ -142,22 +148,28 @@ export function draftTitle(draft: NewDraft): string {
 /**
  * Whether the draft is complete enough to write.
  *
- * Three things can be wrong. An amount left at zero, which is the value the dose and rate fields
+ * Four things can be wrong. An amount left at zero, which is the value the dose and rate fields
  * open on when the case holds nothing to copy — a dose of zero is not a dose, and the alternative,
  * opening on some plausible number, would be inventing a dose the user did not choose. A blood
  * pressure with all three numbers switched off, which is not a measurement at all. And a vital
  * outside the range its metric accepts.
  *
- * That last one is where the keypad is caught. Typing can only be stopped at the top — every
+ * The range is where the keypad is caught. Typing can only be stopped at the top — every
  * multi-digit number passes through smaller ones on the way, so a minimum cannot be applied to a
  * half-typed number — which leaves a value below the minimum, including the zero left behind by
  * deleting every digit, reaching the draft. Judging it here rather than in the field is what keeps
  * the range in one place and out of the components, and it is what lets the sheet refuse a number
  * instead of quietly correcting one the user typed.
+ *
+ * The fourth is a unit the catalog does not know, which is an amount that does not say of what. It
+ * cannot arise from the sheet — the picker offers nothing else — but it can be *corrected* in the
+ * sheet, because a record loaded from storage can hold one; that is the flag the completeness
+ * check raises, and refusing the correction until a real unit is chosen is what makes pressing
+ * that flag lead somewhere. Judged here for the same reason the range is.
  */
 export function isComplete(draft: NewDraft): boolean {
-  if (draft.type === 'bolus') return draft.dose > 0
-  if (draft.type === 'infusion') return draft.rate > 0
+  if (draft.type === 'bolus') return draft.dose > 0 && BOLUS_UNITS.includes(draft.unit)
+  if (draft.type === 'infusion') return draft.rate > 0 && INFUSION_UNITS.includes(draft.unit)
   if (draft.type === 'vital') return inRange(draft.vital, draft.value)
   if (draft.type === 'bloodPressure') {
     const measured = measuredPressures(draft)

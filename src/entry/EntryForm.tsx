@@ -137,6 +137,22 @@ function UnitPicker<Unit extends string>({
   unit: Unit
   onChange: (unit: Unit) => void
 }) {
+  /**
+   * A unit the catalog does not know — absent, or a string from an older build — is shown as its
+   * own selected option rather than being quietly dropped.
+   *
+   * Without it the control lies twice over. AntD's `Segmented` has no unselected state: handed a
+   * `value` that matches no option it highlights the first one, so a dose the record holds no unit
+   * for was displayed as „mg" — a value the record does not contain, shown in a clinical document
+   * as though it did. And because AntD then believed „mg" was already the selection, pressing it
+   * fired no change at all, so the one repair the completeness check sends the user here to make
+   * was the one it would not accept. This is the path in through `storage.ts`, whose guard does
+   * not check units; nothing the sheet itself can produce reaches it.
+   *
+   * „fehlt" is the same word the flag uses, so the list and the sheet name one thing once.
+   */
+  const known = units.includes(unit)
+
   return (
     <div className="unit-picker">
       <span className="unit-picker__caption" id="unit-picker-label">
@@ -144,8 +160,8 @@ function UnitPicker<Unit extends string>({
       </span>
       <Segmented
         size="large"
-        options={units}
-        value={unit}
+        options={known ? units : [{ value: unit ?? '', label: 'fehlt' }, ...units]}
+        value={unit ?? ''}
         onChange={(next) => onChange(next as Unit)}
         aria-labelledby="unit-picker-label"
       />
