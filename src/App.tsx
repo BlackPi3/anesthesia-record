@@ -20,7 +20,7 @@ import { AddEntry } from './entry/AddEntry'
 import { EditEntry } from './entry/EditEntry'
 import { addDraft, correctDraft } from './entry/draft'
 import { targetKey, type AddTarget } from './entry/target'
-import { correctVital, removeEntry } from './domain/mutations'
+import { correctVitals, removeEntry } from './domain/mutations'
 import { clearCase, loadCase, saveCase } from './domain/storage'
 import type { AnesthesiaCase } from './domain/types'
 import { Timeline } from './timeline/Timeline'
@@ -145,7 +145,7 @@ function OpenCase({ initial }: { initial: AnesthesiaCase }) {
       <main className="app__main">
         <Timeline
           record={record}
-          onCorrect={(id, next) => update(correctVital(record, id, next))}
+          onCorrect={(corrections) => update(correctVitals(record, corrections))}
           onRemove={(id) => update(removeEntry(record, id))}
           onEdit={setEditingId}
           onAdd={setAdding}

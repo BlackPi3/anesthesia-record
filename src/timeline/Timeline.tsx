@@ -232,9 +232,22 @@ function labelWidth(text: string): number {
 
 // ---------------------------------------------------------------------------
 
+/** One vital moved to a new time and/or value, by its id. */
+export interface VitalCorrection {
+  id: string
+  at: Timestamp
+  value: number
+}
+
 export interface TimelineProps {
   record: AnesthesiaCase
-  onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
+  /**
+   * Corrections to apply as one step. A blood pressure reading's three entries share a timestamp,
+   * so dragging any one of them in time carries the other two along in the same array rather than
+   * as three separate calls — `App.tsx` folds an array over one record, and three calls each
+   * reading the record before any of them had written would silently drop all but the last.
+   */
+  onCorrect: (corrections: VitalCorrection[]) => void
   onRemove: (id: string) => void
   /** Asks for an entry to be opened for editing: the bands' only route in, and a vital's readout. */
   onEdit: (id: string) => void
@@ -601,6 +614,12 @@ interface Drag {
   armed: boolean
   at: Timestamp
   value: number
+  /**
+   * The other entries of the same blood pressure reading, empty on every other lane. Their time
+   * moves with `at` while the drag is live, and their own value is what gets written back —
+   * dragging one marker moves the reading in time; it never touches what the other two measured.
+   */
+  siblings: { id: string; value: number }[]
 }
 
 interface LaneProps {
@@ -613,7 +632,7 @@ interface LaneProps {
   showValues: boolean
   onSelect: (id: string | null) => void
   onToggleValues: () => void
-  onCorrect: (id: string, next: { at: Timestamp; value: number }) => void
+  onCorrect: (corrections: VitalCorrection[]) => void
   onRemove: (id: string) => void
   onEdit: (id: string) => void
 }
@@ -689,7 +708,8 @@ function VitalLane({
     points: vitalSeries(record, kind)
       .map((entry): LanePoint => {
         const live = drag && drag.id === entry.id ? drag : null
-        const at = live ? live.at : entry.at
+        const linked = drag && drag.siblings.some((sibling) => sibling.id === entry.id) ? drag : null
+        const at = live ? live.at : linked ? linked.at : entry.at
         const value = live ? live.value : entry.value
         // Drawn at the edge when it is past it, so the mark stays inside its own lane and inside
         // the hit radius that selects it. The number itself is untouched; only `y` is clamped.
@@ -818,6 +838,16 @@ function VitalLane({
     // question, answered below.
     onSelect(hit.id)
 
+    // The blood pressure lane's three markers are one reading sharing one timestamp. A drag of
+    // any one of them moves the reading in time; it never moves the other two in value, which is
+    // why only their ids and current values are kept, not a live copy of their position.
+    const siblings =
+      lane.id === 'bloodPressure'
+        ? (readings(points).find((group) => group.some((point) => point.id === hit.id)) ?? [])
+            .filter((point) => point.id !== hit.id)
+            .map((point) => ({ id: point.id, value: point.value }))
+        : []
+
     // A mouse and a stylus are precise enough to mean the point they land on, so they arm at
     // once, exactly as before. A touch is not: the same gesture that grabs a point is the one
     // that scrolls the page, so it has to be held first. Until then nothing is captured and the
@@ -844,6 +874,7 @@ function VitalLane({
       armed,
       at: hit.at,
       value: hit.value,
+      siblings,
     })
   }
 
@@ -918,7 +949,12 @@ function VitalLane({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    if (drag.armed && drag.moved) onCorrect(drag.id, { at: drag.at, value: drag.value })
+    if (drag.armed && drag.moved) {
+      onCorrect([
+        { id: drag.id, at: drag.at, value: drag.value },
+        ...drag.siblings.map((sibling) => ({ id: sibling.id, at: drag.at, value: sibling.value })),
+      ])
+    }
     setDrag(null)
   }
 
@@ -946,10 +982,20 @@ function VitalLane({
     const [floor, ceiling] = VITALS[active.kind].inputRange
     const move = (at: Timestamp, value: number) => {
       event.preventDefault()
-      onCorrect(active.id, {
-        at: clamp(at, window.from, window.to),
-        value: snapToStep(clamp(value, floor, ceiling), step),
-      })
+      const nextAt = clamp(at, window.from, window.to)
+      const nextValue = snapToStep(clamp(value, floor, ceiling), step)
+      // Left/Right move the reading in time, same as a drag; Up/Down leave `at` untouched, so no
+      // sibling ever moves for a value-only step.
+      const siblings =
+        lane.id === 'bloodPressure' && nextAt !== active.at
+          ? (readings(points).find((group) => group.some((point) => point.id === active.id)) ?? []).filter(
+              (point) => point.id !== active.id,
+            )
+          : []
+      onCorrect([
+        { id: active.id, at: nextAt, value: nextValue },
+        ...siblings.map((sibling) => ({ id: sibling.id, at: nextAt, value: sibling.value })),
+      ])
     }
 
     switch (event.key) {

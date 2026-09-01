@@ -195,6 +195,80 @@ test('the sheet shows what the value was before it was corrected', async ({ page
   await expect(sheet(page).getByText(/Wert 81/)).toBeVisible()
 })
 
+/**
+ * A blood pressure reading is three entries sharing one timestamp (see docs/decisions.md, "NiBP
+ * entered as one reading, stored as three entries"). Alexander, reviewing the app, dragged the
+ * mean marker and watched it move independently of systolic and diastolic — "der sollte schon
+ * stabil zwischen den Werten sein". The marker had no special handling: it was hit-tested and
+ * dragged exactly like any other lane point, so its time could drift away from the reading it
+ * belongs to. These assert the fix — dragging any one marker in time carries the whole reading
+ * with it; dragging it in value only ever touches that one marker.
+ */
+test('dragging the mean marker in time carries systolic and diastolic with it', async ({ page }) => {
+  const sysBefore = await storedEntry(page, 'demo-bloodPressureSystolic-0')
+  const diaBefore = await storedEntry(page, 'demo-bloodPressureDiastolic-0')
+
+  const from = await centreOf(page, 'demo-bloodPressureMean-0')
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 30, from.y, { steps: 8 })
+  await page.mouse.up()
+
+  const meanAfter = await storedEntry(page, 'demo-bloodPressureMean-0')
+  const sysAfter = await storedEntry(page, 'demo-bloodPressureSystolic-0')
+  const diaAfter = await storedEntry(page, 'demo-bloodPressureDiastolic-0')
+
+  expect(meanAfter.at).toBeGreaterThan(sysBefore.at)
+  // The reading moved together: all three now share the mean's new time.
+  expect(sysAfter.at).toBe(meanAfter.at)
+  expect(diaAfter.at).toBe(meanAfter.at)
+  // Only the marker actually dragged records a revision.
+  expect(sysAfter.value).toBe(sysBefore.value)
+  expect(diaAfter.value).toBe(diaBefore.value)
+  expect(sysAfter.revisions).toHaveLength(1)
+  expect(diaAfter.revisions).toHaveLength(1)
+})
+
+test('dragging the mean marker in value only leaves systolic and diastolic untouched', async ({
+  page,
+}) => {
+  const meanBefore = await storedEntry(page, 'demo-bloodPressureMean-0')
+  const sysBefore = await storedEntry(page, 'demo-bloodPressureSystolic-0')
+  const diaBefore = await storedEntry(page, 'demo-bloodPressureDiastolic-0')
+
+  const from = await centreOf(page, 'demo-bloodPressureMean-0')
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x, from.y - 20, { steps: 8 })
+  await page.mouse.up()
+
+  const meanAfter = await storedEntry(page, 'demo-bloodPressureMean-0')
+  const sysAfter = await storedEntry(page, 'demo-bloodPressureSystolic-0')
+  const diaAfter = await storedEntry(page, 'demo-bloodPressureDiastolic-0')
+
+  expect(meanAfter.value).toBeGreaterThan(meanBefore.value)
+  expect(meanAfter.at).toBe(sysBefore.at)
+  expect(sysAfter).toEqual(sysBefore)
+  expect(diaAfter).toEqual(diaBefore)
+})
+
+test('dragging systolic in time carries the mean and diastolic of the same reading with it', async ({
+  page,
+}) => {
+  const from = await centreOf(page, 'demo-bloodPressureSystolic-0')
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x - 30, from.y, { steps: 8 })
+  await page.mouse.up()
+
+  const sysAfter = await storedEntry(page, 'demo-bloodPressureSystolic-0')
+  const meanAfter = await storedEntry(page, 'demo-bloodPressureMean-0')
+  const diaAfter = await storedEntry(page, 'demo-bloodPressureDiastolic-0')
+
+  expect(meanAfter.at).toBe(sysAfter.at)
+  expect(diaAfter.at).toBe(sysAfter.at)
+})
+
 test('the keyboard reaches the sheet from a selected point', async ({ page }) => {
   const at = await centreOf(page, 'demo-heartRate-30')
   await page.mouse.click(at.x, at.y)
