@@ -1681,6 +1681,52 @@ stored envelope and reloads, rather than asserting against a case the interface 
 
 ---
 
+## 2026-09-01 — A blood pressure reading moves together in time; a value never does
+
+**What:** Alexander, reviewing the app, dragged the Blutdruck mean marker and watched it move on
+its own — *"der sollte schon stabil zwischen den Werten sein."* Reproduced before any fix: the
+mean's marker was hit-tested and dragged exactly like any other lane point, with nothing tying it
+to the systolic and diastolic readings taken in the same cuff inflation. Dragging it moved its `at`
+away from theirs, splitting one reading into two different times. Fixed generally, not just for the
+mean: on the Blutdruck lane, dragging any one of the three markers horizontally now carries the
+other two along to the same new time; dragging one vertically still touches only that marker's
+value. The keyboard's arrow-key path got the same split — Left/Right move the reading, Up/Down move
+one value — since it is the same correction through a different input.
+
+**Why the value stays untouched.** The obvious-looking fix — derive the mean from systolic and
+diastolic while it is dragged — is the one thing this app is not allowed to do: MAD is read off the
+monitor and entered, never calculated, which the brief states outright and which `CLAUDE.md`
+repeats for exactly this pair of numbers. What actually broke was the *time* the three share, not
+which of them is a real measurement, so the fix locks time and leaves every value exactly as
+independent as the 2026-08-16 NiBP entry decided it should be — a correction later, to just one of
+the three, is still how an artefact gets fixed without touching the other two.
+
+**Why every marker, not only the mean.** The backlog note that raised this named the mean
+specifically, because that is the marker Alexander happened to drag. The actual defect was in
+`hitTest` and the drag handlers treating every point on the lane identically, which means systolic
+and diastolic could be pulled loose from their reading exactly the same way — reproduced and
+covered by `tests/correction.spec.ts`. Special-casing only the mean would have fixed the reported
+symptom and left the same bug live under the other two markers.
+
+**A second, more general bug surfaced on the way in.** `onCorrect` took one id and one patch, and
+`App.tsx` wired it as `update(correctVital(record, id, next))`, reading `record` from render-time
+closure. Calling it twice in the same handler — once for the dragged marker, once for a sibling —
+would have read the same pre-drag `record` both times and written it back twice, with the second
+`setRecord` silently discarding the first: exactly the failure mode `useCase.ts`'s `update` was
+never exercised against, because nothing before this called it more than once per gesture. Fixed by
+widening the contract to a batch: `onCorrect` now takes an array of `{ id, at, value }`, and the new
+`correctVitals` in `mutations.ts` folds `correctVital` over one record — the same fold-over-one-
+record shape `addDraft` already uses for writing a reading's three entries as one undo step, applied
+here to correcting them.
+
+**Rejected:** deriving the mean from the bracket while dragging (rules out by the no-calculation
+constraint, above). Locking the mean's marker so it cannot be dragged at all, only corrected through
+the sheet (loses the direct-manipulation path this app is graded on, for no reason once the actual
+defect — the shared timestamp — was found and fixed). Special-casing only the mean (leaves the same
+bug reachable through systolic or diastolic, untested and unfixed).
+
+---
+
 ## Open decisions (not yet made)
 
 - **The left gutter is settled.** It is 88px, and the row's name is the control that opens its

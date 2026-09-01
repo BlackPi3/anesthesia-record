@@ -201,6 +201,24 @@ export function correctVital(
   })
 }
 
+/**
+ * Corrects several vitals as one step, folding `correctVital` over a single record. A blood
+ * pressure reading's three entries share a timestamp, so dragging one of them in time carries the
+ * other two in the same call — each still reading the record the one before it already wrote,
+ * which three separate `correctVital` calls from outside would not, since each of those would read
+ * the record as it stood before any of the three had written.
+ */
+export function correctVitals(
+  record: AnesthesiaCase,
+  corrections: readonly (VitalFields & { id: string })[],
+  now: Timestamp = Date.now(),
+): AnesthesiaCase {
+  return corrections.reduce(
+    (next, { id, at, value }) => correctVital(next, id, { at, value }, now),
+    record,
+  )
+}
+
 /** Corrects a dose: its time, the drug, the amount or the unit. */
 export function correctBolus(
   record: AnesthesiaCase,
