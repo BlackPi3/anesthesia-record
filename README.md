@@ -89,8 +89,8 @@ and ranges, the local-storage persistence layer, and a fictional demo case.
 
 134 unit tests cover the domain layer, the completeness rules, the rule that decides whether an
 entry may be written at all, the keypad's typing rules, and the timeline's coordinate and
-label-placement maths. 108 Playwright tests run across desktop Chrome, an
-iPad-sized viewport with touch, and WebKit — 318 runs in all, of which 11 are skipped by design:
+label-placement maths. 111 Playwright tests run across desktop Chrome, an
+iPad-sized viewport with touch, and WebKit — 327 runs in all, of which 11 are skipped by design:
 the stories are recorded once on Chromium, and the touch gestures can only be driven there.
 
 ## Data model

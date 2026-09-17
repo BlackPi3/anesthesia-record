@@ -1,7 +1,7 @@
 #!/bin/sh
 # The three checks that run in under five seconds, before every commit.
 #
-# The fourth — `npm run e2e` — is deliberately not here. It is 237 runs across three browsers and
+# The fourth — `npm run e2e` — is deliberately not here. It is 327 runs across three browsers and
 # costs minutes, and CI runs it on every pull request, which is the whole reason it was moved
 # there. A hook that takes minutes is a hook that gets bypassed.
 #
