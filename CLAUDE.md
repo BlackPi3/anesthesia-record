@@ -5,7 +5,7 @@ Digitales Narkoseprotokoll, built against the Sikant coding challenge
 ambulatory procedures on **iPad and desktop**, replacing the paper protocol.
 
 This file is what an agent works against. The requirements below come from the brief and are not
-negotiable; the rules after them are corrections folded back in as the build hit them.
+negotiable, with one deliberate exception marked where it is listed (the router); the rules after them are corrections folded back in as the build hit them.
 
 ---
 
@@ -14,8 +14,11 @@ negotiable; the rules after them are corrections folded back in as the build hit
 - **React** and **TypeScript**
 - **Ant Design** as the primary component and form system. Theme customisation is expected and
   default styling is called out as a negative, so `src/theme.ts` is deliberate and stays that way.
-- **React Router** (chosen over Next.js: no backend, so server rendering and API routes solve
-  problems this app does not have. Reasoning in `docs/decisions.md`.)
+- **No router, and not Next.js.** The brief lists "Next.js or React Router"; this app uses
+  neither, deliberately. Next.js was rejected because there is no backend, so server rendering and
+  API routes solve problems this app does not have. React Router was installed at scaffold, never
+  imported, and removed on 2026-09-17: the app is one screen. Do not add a router until a second
+  screen needs one. Reasoning in `docs/decisions.md`.
 - **SVG** for the timeline, hand-rolled. No chart library: a library displays a dataset, and the
   graded interaction runs the other way, mapping a pointer position back to a timestamp and a value.
 - **Local persistence only**, no backend.
