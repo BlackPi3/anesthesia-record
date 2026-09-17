@@ -85,6 +85,10 @@ for a real backend later without a UI rewrite, since only the persistence layer 
 
 ## 2026-08-07 — App framework: React Router + Vite over Next.js
 
+> **Revised 2026-09-17** — React Router was never imported, and it has been removed; see *React
+> Router removed: the app never had a second screen* at the end of this log. The half of this entry
+> that rejects Next.js stands unchanged.
+
 **What:** Scaffold the app with Vite + React + TypeScript, using React Router for navigation.
 
 **Why:** The brief explicitly permits either Next.js or React Router
@@ -1724,6 +1728,33 @@ constraint, above). Locking the mean's marker so it cannot be dragged at all, on
 the sheet (loses the direct-manipulation path this app is graded on, for no reason once the actual
 defect — the shared timestamp — was found and fixed). Special-casing only the mean (leaves the same
 bug reachable through systolic or diastolic, untested and unfixed).
+
+---
+
+## 2026-09-17 — React Router removed: the app never had a second screen
+
+**What:** `react-router` is uninstalled, together with `cookie-es`, which only it depended on. It had
+been in `package.json` since the scaffold (e1afb77) and was never imported anywhere in `src/`. The
+README and `CLAUDE.md` both described it as the app's navigation; both are corrected. Revises the
+2026-08-07 framework entry.
+
+**Why:** The app is one screen. The record, the entry sheet, the completeness list and the empty and
+error states are all states of that screen, not places a user navigates to, so there was never a
+route to declare. A dependency that is installed and documented but never imported is a false
+statement about the codebase: anyone reading `package.json` or the README would assume routing
+exists. Nothing imported it, so it never reached the bundle either, and removing it changes nothing a
+user can see.
+
+**What this departs from.** The brief's mandatory stack lists "Next.js or React Router". What it
+states is a choice between two frameworks; what it implies is that one of them is used, and this app
+now uses neither. That is a deliberate deviation, taken after the submission, and it is taken rather
+than satisfied for the reason above: wiring a router into a one-screen app would add code whose only
+purpose is to be listed.
+
+**Rejected:** Keeping the dependency and correcting only the docs (leaves an unused package that
+reads as a feature). Adding routes so that it is used (a router with one route does nothing, and
+`CLAUDE.md` counts unexplained code as a defect). A router earns its place when a second screen
+exists — a list of cases, for instance — and that is the point to add one.
 
 ---
 

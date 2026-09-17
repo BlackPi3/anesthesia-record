@@ -158,9 +158,11 @@ Full reasoning and rejected alternatives are in [`docs/decisions.md`](docs/decis
 - **Local persistence only**, no backend. A fixed constraint of the project, and the one that
   shapes the most: it puts every interesting problem in the browser, which is where this app's
   problems actually are.
-- **App framework: React Router + Vite**, over Next.js. Next.js's main advantages — server
-  rendering, API routes — solve problems a backend-less app does not have, so React Router keeps
-  the whole thing as plain client-side React with nothing to explain away.
+- **Plain client-side React on Vite, with no router.** The brief's stack names Next.js or React
+  Router. Next.js's main advantages — server rendering, API routes — solve problems a backend-less
+  app does not have. React Router was installed at the start and never imported, because the app
+  is one screen with nothing to route between, so it was removed rather than left in
+  `package.json` looking like a feature.
 - **Values are typed, not dialled** — a keypad, not a slider or a wheel. The number is already known
   when the sheet opens, and a gesture can only approximate it: a pixel is worth more than one unit
   on most of these axes.
@@ -298,8 +300,8 @@ npm install
 npm run dev
 ```
 
-Scaffolded with Vite (`react-ts` template), using React Router for navigation and Ant Design as
-the component/form system.
+Scaffolded with Vite (`react-ts` template), with Ant Design as the component/form system. There is
+no router: the app is a single screen.
 
 ```
 npm run build     # typecheck and production build
